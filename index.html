@@ -1,13 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>HisabKitab — Cloud Accounting for Nepali Business</title>
-</head>
-<body>
-<div id="root"></div>
-<script>
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>HisabKitab</title></head><body><div id="root"></div><script>
 /**
  * @license React
  * react.production.min.js
@@ -40,8 +32,7 @@ c.useEffect=function(a,b){return g.current.useEffect(a,b)};c.useId=function(){re
 c.useState=function(a){return g.current.useState(a)};c.useSyncExternalStore=function(a,b,c){return g.current.useSyncExternalStore(a,b,c)};c.useTransition=function(){return g.current.useTransition()};c.version="18.3.1"});
 })();
 
-</script>
-<script>
+</script><script>
 /**
  * @license React
  * react-dom.production.min.js
@@ -310,8 +301,7 @@ var d=null!=c&&c.hydratedSources||null,e=!1,f="",g=aj;null!==c&&void 0!==c&&(!0=
 function(a,b,c){if(!Vd(b))throw Error(m(200));return Wd(null,a,b,!1,c)};Q.unmountComponentAtNode=function(a){if(!Vd(a))throw Error(m(40));return a._reactRootContainer?(yb(function(){Wd(null,null,a,!1,function(){a._reactRootContainer=null;a[Ja]=null})}),!0):!1};Q.unstable_batchedUpdates=Tf;Q.unstable_renderSubtreeIntoContainer=function(a,b,c,d){if(!Vd(c))throw Error(m(200));if(null==a||void 0===a._reactInternals)throw Error(m(38));return Wd(a,b,c,!1,d)};Q.version="18.3.1-next-f1338f8080-20240426"});
 })();
 
-</script>
-<script>
+</script><script>
 function _extends() { return _extends = Object.assign ? Object.assign.bind() : function (n) { for (var e = 1; e < arguments.length; e++) { var t = arguments[e]; for (var r in t) ({}).hasOwnProperty.call(t, r) && (n[r] = t[r]); } return n; }, _extends.apply(null, arguments); }
 /* ============================================================
    HisabKitab — Phase 1
@@ -740,6 +730,32 @@ const newDB = profile => ({
 });
 const acc = (db, code) => db.accounts.find(a => a.code === code);
 
+/* normalize any old/incomplete db (from earlier versions) to current shape */
+function migrate(db) {
+  if (!db || typeof db !== "object") return newDB();
+  const base = newDB();
+  const out = {
+    profile: {
+      ...base.profile,
+      ...(db.profile || {})
+    },
+    accounts: Array.isArray(db.accounts) && db.accounts.length ? db.accounts : base.accounts,
+    journal: Array.isArray(db.journal) ? db.journal : [],
+    items: Array.isArray(db.items) ? db.items : [],
+    parties: Array.isArray(db.parties) ? db.parties : [],
+    assets: Array.isArray(db.assets) ? db.assets : [],
+    setupDone: db.setupDone === true
+  };
+  // ensure all system accounts exist (old dbs may miss new ones like Loans/TDS)
+  SEED_COA.forEach(s => {
+    if (!out.accounts.some(a => a.code === s.code)) out.accounts.push({
+      id: uid(),
+      ...s
+    });
+  });
+  return out;
+}
+
 /* ---------- ledger math ---------- */
 function computeLedger(db) {
   const byId = {};
@@ -820,7 +836,7 @@ function App() {
         const d = await sget("db:" + s.company);
         if (d) {
           setSession(s);
-          setDb(d);
+          setDb(migrate(d));
         }
       }
       setBoot(false);
@@ -943,8 +959,9 @@ function Auth({
       let d = await sget("db:" + name);
       if (!d) {
         d = newDB();
-        await sset("db:" + name, d);
       }
+      d = migrate(d);
+      await sset("db:" + name, d);
       onIn(name, d);
     }
   };
@@ -998,7 +1015,15 @@ function SetupWizard({
   flash
 }) {
   const [step, setStep] = useState(0);
-  const [p, setP] = useState(db.profile);
+  const [p, setP] = useState(db.profile || {
+    name: "",
+    businessType: "Trading / Retail",
+    pan: "",
+    vatRegistered: true,
+    address: "",
+    fyStartAD: "",
+    logo: ""
+  });
   const [openings, setOpenings] = useState([]); // {accId,debit,credit}
   const [parties, setParties] = useState([]); // {name,kind}
   const [items, setItems] = useState([]); // {name,cost,price,qty}
@@ -3236,6 +3261,4 @@ function Style() {
   `);
 }
 ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
-</script>
-</body>
-</html>
+</script></body></html>
