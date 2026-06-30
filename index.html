@@ -1,5 +1,811 @@
 <!DOCTYPE html>
 <html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>HisabKitab — Cloud Accounting for Nepali Business</title>
+<meta name="description" content="Double-entry accounting with VAT, inventory, fixed assets, and full financial statements for Nepali businesses." />
+<script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel" data-presets="react">
+const { useState, useEffect, useMemo, useCallback } = React;
+
+/* localStorage-backed storage shim (same shape the app expects) */
+const PREFIX = "hisabkitab:";
+const storage = {
+  async get(key){ try{ const r=localStorage.getItem(PREFIX+key); return r==null?null:{key,value:r}; }catch{ return null; } },
+  async set(key,value){ try{ localStorage.setItem(PREFIX+key,value); return {key,value}; }catch{ return null; } },
+  async delete(key){ try{ localStorage.removeItem(PREFIX+key); return {key,deleted:true}; }catch{ return {key,deleted:false}; } },
+};
+
+
+/* =========================================================================
+   HisabKitab — Cloud accounting for Nepali business
+   Double-entry engine • COA • Journal • Inventory • Fixed Assets
+   Receivables/Payables • VAT (13%) & Non-VAT • Balance Sheet • P&L • Cash Flow
+   Data persists via storage (per-company cloud key).
+   ========================================================================= */
+
+/* ---------- storage helpers ---------- */
+const sget = async (k) => { try { const r = await storage.get(k); return r ? JSON.parse(r.value) : null; } catch { return null; } };
+const sset = async (k, v) => { try { await storage.set(k, JSON.stringify(v)); return true; } catch { return false; } };
+const sdel = async (k) => { try { await storage.delete(k); } catch {} };
+
+/* ---------- money / date ---------- */
+const NRS = (n) => "रू " + (Number(n) || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const num = (n) => (Number(n) || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const today = () => new Date().toISOString().slice(0, 10);
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+const VAT_RATE = 0.13;
+
+/* ---------- Chart of Accounts seed (Nepali SMB, NFRS-aligned) ----------
+   type: asset | liability | equity | income | expense
+   normal balance derived from type. code follows a simple ledger numbering. */
+const SEED_COA = [
+  // Assets 1000s
+  { code: "1010", name: "Cash in Hand", type: "asset", group: "Current Asset", system: true },
+  { code: "1020", name: "Bank Account", type: "asset", group: "Current Asset", system: true },
+  { code: "1100", name: "Accounts Receivable", type: "asset", group: "Current Asset", system: true },
+  { code: "1200", name: "Inventory", type: "asset", group: "Current Asset", system: true },
+  { code: "1300", name: "VAT Receivable (Input)", type: "asset", group: "Current Asset", system: true },
+  { code: "1500", name: "Fixed Assets", type: "asset", group: "Fixed Asset", system: true },
+  { code: "1590", name: "Accumulated Depreciation", type: "asset", group: "Fixed Asset", contra: true, system: true },
+  // Liabilities 2000s
+  { code: "2010", name: "Accounts Payable", type: "liability", group: "Current Liability", system: true },
+  { code: "2100", name: "VAT Payable (Output)", type: "liability", group: "Current Liability", system: true },
+  { code: "2200", name: "TDS Payable", type: "liability", group: "Current Liability", system: true },
+  // Equity 3000s
+  { code: "3010", name: "Owner's Capital", type: "equity", group: "Equity", system: true },
+  { code: "3020", name: "Drawings", type: "equity", group: "Equity", contra: true, system: true },
+  { code: "3900", name: "Retained Earnings", type: "equity", group: "Equity", system: true },
+  // Income 4000s
+  { code: "4010", name: "Sales Revenue", type: "income", group: "Operating Income", system: true },
+  { code: "4900", name: "Other Income", type: "income", group: "Other Income" },
+  // Expense 5000s
+  { code: "5010", name: "Cost of Goods Sold", type: "expense", group: "COGS", system: true },
+  { code: "5100", name: "Salaries & Wages", type: "expense", group: "Operating Expense" },
+  { code: "5110", name: "Rent Expense", type: "expense", group: "Operating Expense" },
+  { code: "5120", name: "Utilities", type: "expense", group: "Operating Expense" },
+  { code: "5130", name: "Office Expense", type: "expense", group: "Operating Expense" },
+  { code: "5800", name: "Depreciation Expense", type: "expense", group: "Operating Expense", system: true },
+];
+
+const TYPE_META = {
+  asset: { label: "Asset", normal: "debit" },
+  liability: { label: "Liability", normal: "credit" },
+  equity: { label: "Equity", normal: "credit" },
+  income: { label: "Income", normal: "credit" },
+  expense: { label: "Expense", normal: "debit" },
+};
+
+/* default empty company db */
+const newDB = () => ({
+  accounts: SEED_COA.map((a) => ({ id: uid(), ...a })),
+  journal: [],     // {id,date,memo,lines:[{accId,debit,credit}],ref,tag}
+  items: [],       // {id,name,unit,price,cost,qty}  qty = running stock
+  parties: [],     // {id,name,kind:'customer'|'supplier',pan}
+  assets: [],      // {id,name,accId,cost,date,life,method,salvage,accumDep}
+  meta: { startCapitalBooked: false },
+});
+
+/* ============================ APP ============================ */
+function App() {
+  const [boot, setBoot] = useState(true);
+  const [session, setSession] = useState(null); // {company}
+  const [db, setDb] = useState(null);
+  const [tab, setTab] = useState("dashboard");
+  const [toast, setToast] = useState(null);
+
+  const flash = (m) => { setToast(m); setTimeout(() => setToast(null), 2600); };
+
+  // restore session
+  useEffect(() => { (async () => {
+    const s = await sget("session");
+    if (s?.company) { const d = await sget("db:" + s.company); if (d) { setSession(s); setDb(d); } }
+    setBoot(false);
+  })(); }, []);
+
+  // persist db (debounced-ish)
+  const saveDb = useCallback(async (next) => {
+    setDb(next);
+    if (session?.company) await sset("db:" + session.company, next);
+  }, [session]);
+
+  const logout = async () => { await sdel("session"); setSession(null); setDb(null); setTab("dashboard"); };
+
+  if (boot) return <Splash />;
+  if (!session || !db) return <Auth onIn={async (company, freshDb) => {
+    const s = { company }; await sset("session", s);
+    setSession(s); setDb(freshDb); flash("Signed in to " + company);
+  }} flash={flash} />;
+
+  const ctx = { db, saveDb, flash };
+  const tabs = [
+    ["dashboard", "Dashboard"], ["journal", "Journal"], ["coa", "Chart of Accounts"],
+    ["inventory", "Inventory"], ["sales", "Sales / Purchase"], ["parties", "Debtors / Creditors"],
+    ["assets", "Fixed Assets"], ["pl", "Profit & Loss"], ["bs", "Balance Sheet"], ["cf", "Cash Flow"],
+  ];
+
+  return (
+    <div className="hk-root">
+      <Style />
+      <header className="hk-top">
+        <div className="hk-brand"><span className="hk-logo">हिसाब</span><b>HisabKitab</b><em>{session.company}</em></div>
+        <button className="hk-ghost" onClick={logout}>Sign out</button>
+      </header>
+      <nav className="hk-nav">
+        {tabs.map(([k, l]) => (
+          <button key={k} className={"hk-navbtn" + (tab === k ? " on" : "")} onClick={() => setTab(k)}>{l}</button>
+        ))}
+      </nav>
+      <main className="hk-main">
+        {tab === "dashboard" && <Dashboard {...ctx} go={setTab} />}
+        {tab === "journal" && <Journal {...ctx} />}
+        {tab === "coa" && <COA {...ctx} />}
+        {tab === "inventory" && <Inventory {...ctx} />}
+        {tab === "sales" && <SalesPurchase {...ctx} />}
+        {tab === "parties" && <Parties {...ctx} />}
+        {tab === "assets" && <Assets {...ctx} />}
+        {tab === "pl" && <ProfitLoss {...ctx} />}
+        {tab === "bs" && <BalanceSheet {...ctx} />}
+        {tab === "cf" && <CashFlow {...ctx} />}
+      </main>
+      {toast && <div className="hk-toast">{toast}</div>}
+    </div>
+  );
+}
+
+/* ============================ ledger math ============================ */
+function useLedger(db) {
+  return useMemo(() => {
+    const byId = {}; db.accounts.forEach((a) => (byId[a.id] = a));
+    const bal = {}; db.accounts.forEach((a) => (bal[a.id] = 0));
+    db.journal.forEach((e) => e.lines.forEach((l) => {
+      const a = byId[l.accId]; if (!a) return;
+      const d = Number(l.debit) || 0, c = Number(l.credit) || 0;
+      // signed by normal balance: debit-normal => debit - credit; credit-normal => credit - debit
+      bal[l.accId] += (TYPE_META[a.type].normal === "debit") ? (d - c) : (c - d);
+    }));
+    const sum = (type, grp) => db.accounts
+      .filter((a) => a.type === type && (!grp || a.group === grp))
+      .reduce((s, a) => s + (a.contra ? -1 : 1) * (bal[a.id] || 0), 0);
+    return { byId, bal, sum };
+  }, [db]);
+}
+
+/* net income (income - expense) for retained earnings & CF */
+const netIncome = (L, db) => L.sum("income") - L.sum("expense");
+
+/* ============================ Dashboard ============================ */
+function Dashboard({ db, go }) {
+  const L = useLedger(db);
+  const cash = (L.bal[acc(db, "1010")?.id] || 0) + (L.bal[acc(db, "1020")?.id] || 0);
+  const ar = L.bal[acc(db, "1100")?.id] || 0;
+  const ap = L.bal[acc(db, "2010")?.id] || 0;
+  const ni = netIncome(L, db);
+  const vatNet = (L.bal[acc(db, "2100")?.id] || 0) - (L.bal[acc(db, "1300")?.id] || 0);
+  const cards = [
+    ["Cash & Bank", cash, "cash"], ["Receivable", ar, "ar"], ["Payable", ap, "ap"],
+    ["Net Profit", ni, ni >= 0 ? "pos" : "neg"], ["VAT Payable (net)", vatNet, "vat"],
+    ["Stock Value", db.items.reduce((s, i) => s + (Number(i.qty) || 0) * (Number(i.cost) || 0), 0), "stock"],
+  ];
+  return (
+    <div>
+      <H title="Dashboard" sub="Live position from your double-entry ledger." />
+      <div className="hk-cards">
+        {cards.map(([l, v, c]) => (
+          <div key={l} className={"hk-card kpi " + c}><span>{l}</span><b>{NRS(v)}</b></div>
+        ))}
+      </div>
+      <div className="hk-card">
+        <div className="hk-rowhead"><b>Quick actions</b></div>
+        <div className="hk-quick">
+          <button className="hk-btn" onClick={() => go("sales")}>New Sale / Purchase</button>
+          <button className="hk-btn alt" onClick={() => go("journal")}>Manual Journal</button>
+          <button className="hk-btn alt" onClick={() => go("assets")}>Book Asset</button>
+          <button className="hk-btn alt" onClick={() => go("bs")}>View Balance Sheet</button>
+        </div>
+      </div>
+      <TrialBalance db={db} L={L} />
+    </div>
+  );
+}
+
+function TrialBalance({ db, L }) {
+  let td = 0, tc = 0;
+  const rows = db.accounts.map((a) => {
+    const b = L.bal[a.id] || 0; if (Math.abs(b) < 0.005) return null;
+    const dr = TYPE_META[a.type].normal === "debit" ? b : -b;
+    const debit = dr > 0 ? dr : 0, credit = dr < 0 ? -dr : 0;
+    td += debit; tc += credit;
+    return <tr key={a.id}><td>{a.code}</td><td>{a.name}</td><td className="r">{debit ? num(debit) : ""}</td><td className="r">{credit ? num(credit) : ""}</td></tr>;
+  }).filter(Boolean);
+  return (
+    <div className="hk-card">
+      <div className="hk-rowhead"><b>Trial Balance</b><span className={Math.abs(td - tc) < 0.01 ? "ok" : "bad"}>{Math.abs(td - tc) < 0.01 ? "Balanced" : "Out by " + num(Math.abs(td - tc))}</span></div>
+      <table className="hk-table"><thead><tr><th>Code</th><th>Account</th><th className="r">Debit</th><th className="r">Credit</th></tr></thead>
+        <tbody>{rows}</tbody>
+        <tfoot><tr><td></td><td>Total</td><td className="r">{num(td)}</td><td className="r">{num(tc)}</td></tr></tfoot>
+      </table>
+    </div>
+  );
+}
+
+const acc = (db, code) => db.accounts.find((a) => a.code === code);
+
+/* ============================ Chart of Accounts ============================ */
+function COA({ db, saveDb, flash }) {
+  const [f, setF] = useState({ code: "", name: "", type: "expense", group: "" });
+  const add = () => {
+    if (!f.code || !f.name) return flash("Code and name required.");
+    if (db.accounts.some((a) => a.code === f.code)) return flash("Code already exists.");
+    saveDb({ ...db, accounts: [...db.accounts, { id: uid(), ...f, group: f.group || TYPE_META[f.type].label }] });
+    setF({ code: "", name: "", type: "expense", group: "" }); flash("Account added.");
+  };
+  const del = (id) => {
+    const a = db.accounts.find((x) => x.id === id);
+    if (a.system) return flash("System account can't be deleted.");
+    if (db.journal.some((e) => e.lines.some((l) => l.accId === id))) return flash("Account has entries; cannot delete.");
+    saveDb({ ...db, accounts: db.accounts.filter((x) => x.id !== id) }); flash("Removed.");
+  };
+  const grouped = useMemo(() => {
+    const g = {}; ["asset", "liability", "equity", "income", "expense"].forEach((t) => (g[t] = []));
+    [...db.accounts].sort((a, b) => a.code.localeCompare(b.code)).forEach((a) => g[a.type].push(a));
+    return g;
+  }, [db]);
+  return (
+    <div>
+      <H title="Chart of Accounts" sub="The backbone ledger. System accounts are locked; add your own freely." />
+      <div className="hk-card">
+        <div className="hk-form6">
+          <input placeholder="Code e.g. 5140" value={f.code} onChange={(e) => setF({ ...f, code: e.target.value })} />
+          <input placeholder="Account name" value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} />
+          <select value={f.type} onChange={(e) => setF({ ...f, type: e.target.value })}>
+            {Object.entries(TYPE_META).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
+          </select>
+          <input placeholder="Group (optional)" value={f.group} onChange={(e) => setF({ ...f, group: e.target.value })} />
+          <button className="hk-btn" onClick={add}>Add account</button>
+        </div>
+      </div>
+      {Object.entries(grouped).map(([t, list]) => (
+        <div className="hk-card" key={t}>
+          <div className="hk-rowhead"><b>{TYPE_META[t].label}s</b><span className="muted">normal balance: {TYPE_META[t].normal}</span></div>
+          <table className="hk-table"><thead><tr><th>Code</th><th>Name</th><th>Group</th><th></th></tr></thead>
+            <tbody>{list.map((a) => (
+              <tr key={a.id}><td>{a.code}</td><td>{a.name}{a.contra ? " (contra)" : ""}</td><td>{a.group}</td>
+                <td className="r">{a.system ? <span className="muted">locked</span> : <button className="hk-x" onClick={() => del(a.id)}>delete</button>}</td></tr>
+            ))}</tbody>
+          </table>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/* ============================ Journal (manual double-entry) ============================ */
+function Journal({ db, saveDb, flash }) {
+  const blank = () => ({ date: today(), memo: "", lines: [{ accId: "", debit: "", credit: "" }, { accId: "", debit: "", credit: "" }] });
+  const [e, setE] = useState(blank());
+  const setLine = (i, k, v) => { const lines = e.lines.map((l, j) => j === i ? { ...l, [k]: v } : l); setE({ ...e, lines }); };
+  const addLine = () => setE({ ...e, lines: [...e.lines, { accId: "", debit: "", credit: "" }] });
+  const rmLine = (i) => setE({ ...e, lines: e.lines.filter((_, j) => j !== i) });
+  const td = e.lines.reduce((s, l) => s + (Number(l.debit) || 0), 0);
+  const tc = e.lines.reduce((s, l) => s + (Number(l.credit) || 0), 0);
+  const post = () => {
+    const lines = e.lines.filter((l) => l.accId && ((Number(l.debit) || 0) || (Number(l.credit) || 0)));
+    if (lines.length < 2) return flash("Need at least two lines.");
+    if (Math.abs(td - tc) > 0.01) return flash("Debits and credits must match.");
+    saveDb({ ...db, journal: [...db.journal, { id: uid(), date: e.date, memo: e.memo, ref: "JV", lines }] });
+    setE(blank()); flash("Journal posted.");
+  };
+  const del = (id) => saveDb({ ...db, journal: db.journal.filter((x) => x.id !== id) });
+  return (
+    <div>
+      <H title="Journal" sub="Post any manual double-entry. Must balance before it saves." />
+      <div className="hk-card">
+        <div className="hk-form2">
+          <input type="date" value={e.date} onChange={(ev) => setE({ ...e, date: ev.target.value })} />
+          <input placeholder="Narration / memo" value={e.memo} onChange={(ev) => setE({ ...e, memo: ev.target.value })} />
+        </div>
+        <table className="hk-table"><thead><tr><th>Account</th><th className="r">Debit</th><th className="r">Credit</th><th></th></tr></thead>
+          <tbody>{e.lines.map((l, i) => (
+            <tr key={i}>
+              <td><select value={l.accId} onChange={(ev) => setLine(i, "accId", ev.target.value)}>
+                <option value="">— select —</option>
+                {db.accounts.map((a) => <option key={a.id} value={a.id}>{a.code} {a.name}</option>)}
+              </select></td>
+              <td className="r"><input className="amt" type="number" value={l.debit} onChange={(ev) => setLine(i, "debit", ev.target.value)} /></td>
+              <td className="r"><input className="amt" type="number" value={l.credit} onChange={(ev) => setLine(i, "credit", ev.target.value)} /></td>
+              <td className="r">{e.lines.length > 2 && <button className="hk-x" onClick={() => rmLine(i)}>×</button>}</td>
+            </tr>
+          ))}</tbody>
+          <tfoot><tr><td><button className="hk-link" onClick={addLine}>+ add line</button></td>
+            <td className="r"><b>{num(td)}</b></td><td className="r"><b>{num(tc)}</b></td><td></td></tr></tfoot>
+        </table>
+        <div className="hk-rowhead">
+          <span className={Math.abs(td - tc) < 0.01 && td > 0 ? "ok" : "muted"}>{td > 0 ? (Math.abs(td - tc) < 0.01 ? "Balanced" : "Difference " + num(Math.abs(td - tc))) : ""}</span>
+          <button className="hk-btn" onClick={post}>Post entry</button>
+        </div>
+      </div>
+      <Ledger db={db} onDelete={del} />
+    </div>
+  );
+}
+
+function Ledger({ db, onDelete }) {
+  const byId = {}; db.accounts.forEach((a) => (byId[a.id] = a));
+  const rows = [...db.journal].sort((a, b) => b.date.localeCompare(a.date));
+  return (
+    <div className="hk-card">
+      <div className="hk-rowhead"><b>Recent entries</b><span className="muted">{db.journal.length} total</span></div>
+      {rows.length === 0 ? <Empty msg="No entries yet. Post one above or record a sale." /> :
+        <table className="hk-table"><thead><tr><th>Date</th><th>Ref</th><th>Memo</th><th>Lines</th><th></th></tr></thead>
+          <tbody>{rows.slice(0, 50).map((e) => (
+            <tr key={e.id}><td>{e.date}</td><td>{e.ref}</td><td>{e.memo}</td>
+              <td className="mini">{e.lines.map((l, i) => <div key={i}>{byId[l.accId]?.code} {byId[l.accId]?.name}: {Number(l.debit) ? "Dr " + num(l.debit) : "Cr " + num(l.credit)}</div>)}</td>
+              <td className="r"><button className="hk-x" onClick={() => onDelete(e.id)}>delete</button></td></tr>
+          ))}</tbody>
+        </table>}
+    </div>
+  );
+}
+
+/* ============================ Inventory ============================ */
+function Inventory({ db, saveDb, flash }) {
+  const [f, setF] = useState({ name: "", unit: "pcs", cost: "", price: "" });
+  const add = () => {
+    if (!f.name) return flash("Item name required.");
+    saveDb({ ...db, items: [...db.items, { id: uid(), name: f.name, unit: f.unit, cost: Number(f.cost) || 0, price: Number(f.price) || 0, qty: 0 }] });
+    setF({ name: "", unit: "pcs", cost: "", price: "" }); flash("Item added.");
+  };
+  const del = (id) => saveDb({ ...db, items: db.items.filter((x) => x.id !== id) });
+  return (
+    <div>
+      <H title="Inventory" sub="Stock levels update automatically from purchases and sales." />
+      <div className="hk-card">
+        <div className="hk-form5">
+          <input placeholder="Item name" value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} />
+          <input placeholder="Unit" value={f.unit} onChange={(e) => setF({ ...f, unit: e.target.value })} />
+          <input placeholder="Cost price" type="number" value={f.cost} onChange={(e) => setF({ ...f, cost: e.target.value })} />
+          <input placeholder="Sell price" type="number" value={f.price} onChange={(e) => setF({ ...f, price: e.target.value })} />
+          <button className="hk-btn" onClick={add}>Add item</button>
+        </div>
+      </div>
+      <div className="hk-card">
+        {db.items.length === 0 ? <Empty msg="No items yet." /> :
+          <table className="hk-table"><thead><tr><th>Item</th><th className="r">In stock</th><th>Unit</th><th className="r">Cost</th><th className="r">Price</th><th className="r">Stock value</th><th></th></tr></thead>
+            <tbody>{db.items.map((i) => (
+              <tr key={i.id}><td>{i.name}</td><td className={"r" + (i.qty <= 0 ? " bad" : "")}>{num(i.qty)}</td><td>{i.unit}</td>
+                <td className="r">{num(i.cost)}</td><td className="r">{num(i.price)}</td><td className="r">{NRS(i.qty * i.cost)}</td>
+                <td className="r"><button className="hk-x" onClick={() => del(i.id)}>delete</button></td></tr>
+            ))}</tbody>
+          </table>}
+      </div>
+    </div>
+  );
+}
+
+/* ============================ Sales / Purchase (auto journal + COGS + VAT + inventory) ============================ */
+function SalesPurchase({ db, saveDb, flash }) {
+  const [mode, setMode] = useState("sale");
+  const [f, setF] = useState({ date: today(), partyId: "", itemId: "", qty: 1, rate: "", vat: true, settle: "credit" });
+  const item = db.items.find((i) => i.id === f.itemId);
+  const rate = Number(f.rate) || (item ? (mode === "sale" ? item.price : item.cost) : 0);
+  const base = (Number(f.qty) || 0) * rate;
+  const vatAmt = f.vat ? base * VAT_RATE : 0;
+  const total = base + vatAmt;
+
+  const post = () => {
+    if (!item) return flash("Pick an item.");
+    if ((Number(f.qty) || 0) <= 0) return flash("Quantity must be positive.");
+    if (mode === "sale" && f.settle === "credit" && !f.partyId) return flash("Credit sale needs a customer.");
+    const A = (c) => acc(db, c).id;
+    const lines = [];
+    const cashAcc = f.settle === "cash" ? A("1010") : f.settle === "bank" ? A("1020") : null;
+
+    if (mode === "sale") {
+      // Dr cash/AR total ; Cr Sales base ; Cr VAT output
+      if (f.settle === "credit") lines.push({ accId: A("1100"), debit: total, credit: 0 });
+      else lines.push({ accId: cashAcc, debit: total, credit: 0 });
+      lines.push({ accId: A("4010"), debit: 0, credit: base });
+      if (vatAmt) lines.push({ accId: A("2100"), debit: 0, credit: vatAmt });
+      // COGS + inventory relief at cost
+      const cogs = (Number(f.qty) || 0) * (Number(item.cost) || 0);
+      if (cogs > 0) { lines.push({ accId: A("5010"), debit: cogs, credit: 0 }); lines.push({ accId: A("1200"), debit: 0, credit: cogs }); }
+    } else {
+      // purchase: Dr Inventory base ; Dr VAT input ; Cr cash/AP total
+      lines.push({ accId: A("1200"), debit: base, credit: 0 });
+      if (vatAmt) lines.push({ accId: A("1300"), debit: vatAmt, credit: 0 });
+      if (f.settle === "credit") lines.push({ accId: A("2010"), debit: 0, credit: total });
+      else lines.push({ accId: cashAcc, debit: 0, credit: total });
+    }
+    // inventory qty
+    const items = db.items.map((i) => i.id === item.id ? { ...i, qty: (Number(i.qty) || 0) + (mode === "sale" ? -1 : 1) * (Number(f.qty) || 0) } : i);
+    const party = db.parties.find((p) => p.id === f.partyId);
+    const memo = (mode === "sale" ? "Sale" : "Purchase") + " — " + item.name + " ×" + f.qty + (party ? " / " + party.name : "");
+    saveDb({ ...db, items, journal: [...db.journal, { id: uid(), date: f.date, memo, ref: mode === "sale" ? "INV" : "BILL", lines }] });
+    setF({ ...f, qty: 1, rate: "" }); flash((mode === "sale" ? "Sale" : "Purchase") + " recorded & posted.");
+  };
+
+  const partyKind = mode === "sale" ? "customer" : "supplier";
+  return (
+    <div>
+      <H title="Sales / Purchase" sub="One screen — it writes the full journal, VAT, COGS and stock for you." />
+      <div className="hk-tabsmini">
+        <button className={mode === "sale" ? "on" : ""} onClick={() => setMode("sale")}>Sale (invoice)</button>
+        <button className={mode === "purchase" ? "on" : ""} onClick={() => setMode("purchase")}>Purchase (bill)</button>
+      </div>
+      <div className="hk-card">
+        <div className="hk-form2">
+          <input type="date" value={f.date} onChange={(e) => setF({ ...f, date: e.target.value })} />
+          <select value={f.partyId} onChange={(e) => setF({ ...f, partyId: e.target.value })}>
+            <option value="">{partyKind} (optional unless credit)</option>
+            {db.parties.filter((p) => p.kind === partyKind).map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+          </select>
+        </div>
+        <div className="hk-form4">
+          <select value={f.itemId} onChange={(e) => setF({ ...f, itemId: e.target.value })}>
+            <option value="">— select item —</option>
+            {db.items.map((i) => <option key={i.id} value={i.id}>{i.name} (stock {num(i.qty)})</option>)}
+          </select>
+          <input type="number" placeholder="Qty" value={f.qty} onChange={(e) => setF({ ...f, qty: e.target.value })} />
+          <input type="number" placeholder={"Rate (" + (item ? num(rate) : "auto") + ")"} value={f.rate} onChange={(e) => setF({ ...f, rate: e.target.value })} />
+          <select value={f.settle} onChange={(e) => setF({ ...f, settle: e.target.value })}>
+            <option value="credit">On credit</option><option value="cash">Cash</option><option value="bank">Bank</option>
+          </select>
+        </div>
+        <label className="hk-check"><input type="checkbox" checked={f.vat} onChange={(e) => setF({ ...f, vat: e.target.checked })} /> Apply 13% VAT</label>
+        <div className="hk-summary">
+          <div><span>Taxable amount</span><b>{NRS(base)}</b></div>
+          <div><span>VAT 13%</span><b>{NRS(vatAmt)}</b></div>
+          <div className="big"><span>Total</span><b>{NRS(total)}</b></div>
+        </div>
+        <div className="hk-rowhead"><span className="muted">{mode === "sale" ? "Books Sales, VAT output, COGS & relieves stock." : "Books Inventory, VAT input & payable."}</span>
+          <button className="hk-btn" onClick={post}>Record {mode}</button></div>
+      </div>
+    </div>
+  );
+}
+
+/* ============================ Parties (Debtors / Creditors) ============================ */
+function Parties({ db, saveDb, flash }) {
+  const [f, setF] = useState({ name: "", kind: "customer", pan: "" });
+  const L = useLedger(db);
+  const add = () => { if (!f.name) return flash("Name required."); saveDb({ ...db, parties: [...db.parties, { id: uid(), ...f }] }); setF({ name: "", kind: "customer", pan: "" }); flash("Party added."); };
+  const del = (id) => saveDb({ ...db, parties: db.parties.filter((x) => x.id !== id) });
+  const ar = L.bal[acc(db, "1100")?.id] || 0, ap = L.bal[acc(db, "2010")?.id] || 0;
+  return (
+    <div>
+      <H title="Debtors / Creditors" sub="Customers owe you (receivable); suppliers you owe (payable)." />
+      <div className="hk-cards">
+        <div className="hk-card kpi ar"><span>Total Receivable</span><b>{NRS(ar)}</b></div>
+        <div className="hk-card kpi ap"><span>Total Payable</span><b>{NRS(ap)}</b></div>
+      </div>
+      <div className="hk-card">
+        <div className="hk-form4">
+          <input placeholder="Party name" value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} />
+          <select value={f.kind} onChange={(e) => setF({ ...f, kind: e.target.value })}><option value="customer">Customer (debtor)</option><option value="supplier">Supplier (creditor)</option></select>
+          <input placeholder="PAN / VAT no." value={f.pan} onChange={(e) => setF({ ...f, pan: e.target.value })} />
+          <button className="hk-btn" onClick={add}>Add party</button>
+        </div>
+      </div>
+      <div className="hk-card">
+        {db.parties.length === 0 ? <Empty msg="No parties yet." /> :
+          <table className="hk-table"><thead><tr><th>Name</th><th>Type</th><th>PAN/VAT</th><th></th></tr></thead>
+            <tbody>{db.parties.map((p) => (
+              <tr key={p.id}><td>{p.name}</td><td>{p.kind === "customer" ? "Debtor" : "Creditor"}</td><td>{p.pan || "—"}</td>
+                <td className="r"><button className="hk-x" onClick={() => del(p.id)}>delete</button></td></tr>
+            ))}</tbody></table>}
+      </div>
+    </div>
+  );
+}
+
+/* ============================ Fixed Assets & Depreciation ============================ */
+function Assets({ db, saveDb, flash }) {
+  const [f, setF] = useState({ name: "", cost: "", date: today(), life: 5, method: "straight", salvage: 0, settle: "bank" });
+  const book = () => {
+    if (!f.name || !(Number(f.cost) > 0)) return flash("Name and cost required.");
+    const A = (c) => acc(db, c).id;
+    const cost = Number(f.cost);
+    const lines = [{ accId: A("1500"), debit: cost, credit: 0 }, { accId: A(f.settle === "cash" ? "1010" : f.settle === "bank" ? "1020" : "2010"), debit: 0, credit: cost }];
+    const asset = { id: uid(), name: f.name, cost, date: f.date, life: Number(f.life) || 5, method: f.method, salvage: Number(f.salvage) || 0, accumDep: 0 };
+    saveDb({ ...db, assets: [...db.assets, asset], journal: [...db.journal, { id: uid(), date: f.date, ref: "ASSET", memo: "Asset purchase — " + f.name, lines }] });
+    setF({ ...f, name: "", cost: "" }); flash("Asset booked.");
+  };
+  const yearlyDep = (a) => a.method === "straight" ? Math.max(0, (a.cost - a.salvage) / a.life) : (a.cost - a.accumDep) * (1 / a.life) * 2;
+  const runDep = (a) => {
+    const A = (c) => acc(db, c).id;
+    const wdv = a.cost - a.accumDep;
+    const dep = Math.min(yearlyDep(a), Math.max(0, wdv - a.salvage));
+    if (dep <= 0) return flash("Fully depreciated.");
+    const lines = [{ accId: A("5800"), debit: dep, credit: 0 }, { accId: A("1590"), debit: 0, credit: dep }];
+    saveDb({ ...db, assets: db.assets.map((x) => x.id === a.id ? { ...x, accumDep: x.accumDep + dep } : x), journal: [...db.journal, { id: uid(), date: today(), ref: "DEP", memo: "Depreciation — " + a.name, lines }] });
+    flash("Depreciation posted: " + NRS(dep));
+  };
+  const del = (id) => saveDb({ ...db, assets: db.assets.filter((x) => x.id !== id) });
+  return (
+    <div>
+      <H title="Fixed Assets" sub="Book assets and run depreciation (straight-line or WDV double-declining)." />
+      <div className="hk-card">
+        <div className="hk-form6">
+          <input placeholder="Asset name" value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} />
+          <input type="number" placeholder="Cost" value={f.cost} onChange={(e) => setF({ ...f, cost: e.target.value })} />
+          <input type="date" value={f.date} onChange={(e) => setF({ ...f, date: e.target.value })} />
+          <input type="number" placeholder="Life (yrs)" value={f.life} onChange={(e) => setF({ ...f, life: e.target.value })} />
+          <select value={f.method} onChange={(e) => setF({ ...f, method: e.target.value })}><option value="straight">Straight-line</option><option value="wdv">WDV (declining)</option></select>
+          <button className="hk-btn" onClick={book}>Book asset</button>
+        </div>
+        <div className="hk-form2">
+          <input type="number" placeholder="Salvage value" value={f.salvage} onChange={(e) => setF({ ...f, salvage: e.target.value })} />
+          <select value={f.settle} onChange={(e) => setF({ ...f, settle: e.target.value })}><option value="bank">Paid by bank</option><option value="cash">Paid by cash</option><option value="credit">On credit (payable)</option></select>
+        </div>
+      </div>
+      <div className="hk-card">
+        {db.assets.length === 0 ? <Empty msg="No assets booked." /> :
+          <table className="hk-table"><thead><tr><th>Asset</th><th>Method</th><th className="r">Cost</th><th className="r">Accum. dep.</th><th className="r">Book value</th><th></th></tr></thead>
+            <tbody>{db.assets.map((a) => (
+              <tr key={a.id}><td>{a.name}<div className="muted">{a.date} · {a.life}y</div></td><td>{a.method === "straight" ? "SLM" : "WDV"}</td>
+                <td className="r">{num(a.cost)}</td><td className="r">{num(a.accumDep)}</td><td className="r">{NRS(a.cost - a.accumDep)}</td>
+                <td className="r"><button className="hk-link" onClick={() => runDep(a)}>run dep.</button> <button className="hk-x" onClick={() => del(a.id)}>delete</button></td></tr>
+            ))}</tbody></table>}
+      </div>
+    </div>
+  );
+}
+
+/* ============================ Profit & Loss ============================ */
+function ProfitLoss({ db }) {
+  const L = useLedger(db);
+  const income = db.accounts.filter((a) => a.type === "income").map((a) => [a, L.bal[a.id] || 0]).filter(([, b]) => Math.abs(b) > 0.005);
+  const expense = db.accounts.filter((a) => a.type === "expense").map((a) => [a, L.bal[a.id] || 0]).filter(([, b]) => Math.abs(b) > 0.005);
+  const totInc = income.reduce((s, [, b]) => s + b, 0), totExp = expense.reduce((s, [, b]) => s + b, 0);
+  const gp = (L.bal[acc(db, "4010")?.id] || 0) - (L.bal[acc(db, "5010")?.id] || 0);
+  const ni = totInc - totExp;
+  return (
+    <div>
+      <H title="Profit & Loss" sub="Income statement for the current period." />
+      <div className="hk-card report">
+        <Section title="Income" rows={income} total={totInc} />
+        <Row label="Gross Profit (Sales − COGS)" val={gp} strong />
+        <Section title="Expenses" rows={expense} total={totExp} />
+        <div className={"hk-net " + (ni >= 0 ? "pos" : "neg")}><span>Net {ni >= 0 ? "Profit" : "Loss"}</span><b>{NRS(ni)}</b></div>
+      </div>
+    </div>
+  );
+}
+
+/* ============================ Balance Sheet ============================ */
+function BalanceSheet({ db }) {
+  const L = useLedger(db);
+  const ni = netIncome(L, db);
+  const assets = db.accounts.filter((a) => a.type === "asset").map((a) => [a, (a.contra ? -1 : 1) * (L.bal[a.id] || 0)]).filter(([, b]) => Math.abs(b) > 0.005);
+  const liab = db.accounts.filter((a) => a.type === "liability").map((a) => [a, L.bal[a.id] || 0]).filter(([, b]) => Math.abs(b) > 0.005);
+  const equityAccts = db.accounts.filter((a) => a.type === "equity").map((a) => [a, (a.contra ? -1 : 1) * (L.bal[a.id] || 0)]).filter(([, b]) => Math.abs(b) > 0.005);
+  const totA = assets.reduce((s, [, b]) => s + b, 0);
+  const totL = liab.reduce((s, [, b]) => s + b, 0);
+  const totEbase = equityAccts.reduce((s, [, b]) => s + b, 0);
+  const totE = totEbase + ni; // current period profit rolls into equity
+  const diff = totA - (totL + totE);
+  return (
+    <div>
+      <H title="Balance Sheet" sub={"As at " + today() + " · current profit carried to equity."} />
+      <div className="hk-card report">
+        <Section title="Assets" rows={assets} total={totA} />
+        <Section title="Liabilities" rows={liab} total={totL} />
+        <Section title="Equity" rows={[...equityAccts, [{ id: "ni", code: "", name: "Current Period Earnings" }, ni]]} total={totE} />
+        <div className={"hk-net " + (Math.abs(diff) < 0.01 ? "pos" : "neg")}>
+          <span>Assets vs Liabilities + Equity</span><b>{Math.abs(diff) < 0.01 ? "Balanced ✓" : "Out by " + NRS(Math.abs(diff))}</b>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ============================ Cash Flow (indirect, simplified) ============================ */
+function CashFlow({ db }) {
+  const L = useLedger(db);
+  const byRef = (refs) => db.journal.filter((e) => refs.includes(e.ref));
+  const cashAccIds = [acc(db, "1010")?.id, acc(db, "1020")?.id];
+  // Direct approach: classify cash movements by counter-account type/ref.
+  let op = 0, inv = 0, fin = 0;
+  db.journal.forEach((e) => {
+    const cashLines = e.lines.filter((l) => cashAccIds.includes(l.accId));
+    if (!cashLines.length) return;
+    const cashDelta = cashLines.reduce((s, l) => s + (Number(l.debit) || 0) - (Number(l.credit) || 0), 0);
+    if (Math.abs(cashDelta) < 0.005) return;
+    if (e.ref === "ASSET" || e.lines.some((l) => acc(db, "1500")?.id === l.accId)) inv += cashDelta;
+    else if (e.lines.some((l) => [acc(db, "3010")?.id, acc(db, "3020")?.id].includes(l.accId))) fin += cashDelta;
+    else op += cashDelta;
+  });
+  const net = op + inv + fin;
+  const cashNow = (L.bal[cashAccIds[0]] || 0) + (L.bal[cashAccIds[1]] || 0);
+  return (
+    <div>
+      <H title="Cash Flow" sub="Movement of actual cash & bank, grouped by activity." />
+      <div className="hk-card report">
+        <Row label="Operating activities" val={op} strong />
+        <Row label="Investing activities (assets)" val={inv} strong />
+        <Row label="Financing activities (capital/drawings)" val={fin} strong />
+        <div className={"hk-net " + (net >= 0 ? "pos" : "neg")}><span>Net change in cash</span><b>{NRS(net)}</b></div>
+        <Row label="Cash & bank balance now" val={cashNow} strong />
+      </div>
+    </div>
+  );
+}
+
+/* ============================ small report pieces ============================ */
+function Section({ title, rows, total }) {
+  return (
+    <div className="hk-sec">
+      <div className="hk-sech">{title}</div>
+      {rows.length === 0 ? <div className="hk-secrow muted"><span>—</span><span></span></div> :
+        rows.map(([a, b], i) => <div className="hk-secrow" key={a.id || i}><span>{a.code ? a.code + " " : ""}{a.name}</span><span>{NRS(b)}</span></div>)}
+      <div className="hk-secrow tot"><span>Total {title}</span><span>{NRS(total)}</span></div>
+    </div>
+  );
+}
+const Row = ({ label, val, strong }) => <div className={"hk-secrow" + (strong ? " tot" : "")}><span>{label}</span><span>{NRS(val)}</span></div>;
+const Empty = ({ msg }) => <div className="hk-empty">{msg}</div>;
+const H = ({ title, sub }) => <div className="hk-h"><h1>{title}</h1><p>{sub}</p></div>;
+
+/* ============================ Auth ============================ */
+function Auth({ onIn, flash }) {
+  const [tab, setTab] = useState("login");
+  const [company, setCompany] = useState("");
+  const [pin, setPin] = useState("");
+  const submit = async () => {
+    const name = company.trim();
+    if (!name || pin.length < 4) return flash("Company name and 4-digit PIN required.");
+    const key = "auth:" + name.toLowerCase();
+    const existing = await sget(key);
+    if (tab === "register") {
+      if (existing) return flash("Company already exists — sign in instead.");
+      await sset(key, { pin });
+      const fresh = newDB(); await sset("db:" + name, fresh);
+      onIn(name, fresh);
+    } else {
+      if (!existing) return flash("No such company. Register first.");
+      if (existing.pin !== pin) return flash("Wrong PIN.");
+      let d = await sget("db:" + name); if (!d) { d = newDB(); await sset("db:" + name, d); }
+      onIn(name, d);
+    }
+  };
+  return (
+    <div className="hk-auth">
+      <Style />
+      <div className="hk-authcard">
+        <div className="hk-authlogo"><span>हिसाब</span>HisabKitab</div>
+        <p className="hk-authsub">Cloud accounting built for Nepali business — VAT, inventory, assets & full financial statements.</p>
+        <div className="hk-tabsmini auth">
+          <button className={tab === "login" ? "on" : ""} onClick={() => setTab("login")}>Sign in</button>
+          <button className={tab === "register" ? "on" : ""} onClick={() => setTab("register")}>New company</button>
+        </div>
+        <input placeholder="Company / firm name" value={company} onChange={(e) => setCompany(e.target.value)} />
+        <input placeholder="4+ digit PIN" type="password" value={pin} onChange={(e) => setPin(e.target.value.replace(/\D/g, ""))} />
+        <button className="hk-btn full" onClick={submit}>{tab === "register" ? "Create company" : "Enter books"}</button>
+        <p className="hk-authnote">Each company's books are stored separately in the cloud. PIN protects access on this account.</p>
+      </div>
+    </div>
+  );
+}
+
+function Splash() { return <div className="hk-auth"><Style /><div className="hk-authlogo big"><span>हिसाब</span>HisabKitab</div></div>; }
+
+/* ============================ Styles ============================ */
+function Style() {
+  return <style>{`
+  :root{
+    --ink:#10211b; --ink2:#3a4f47; --paper:#f6f4ec; --card:#fffdf7; --line:#e2ddcd;
+    --green:#1f6f54; --green2:#15543f; --gold:#b9892f; --rust:#a23b22; --teal:#2a6f7a;
+    --pos:#1f6f54; --neg:#a23b22;
+  }
+  *{box-sizing:border-box} 
+  .hk-root,.hk-auth{font-family:'Inter','Segoe UI',system-ui,sans-serif;color:var(--ink);background:
+    radial-gradient(1200px 400px at 80% -10%, #eef3ec 0, transparent 60%), var(--paper);min-height:100vh}
+  h1{font-family:Georgia,'Times New Roman',serif}
+  /* top bar */
+  .hk-top{display:flex;justify-content:space-between;align-items:center;padding:14px 22px;background:var(--green2);color:#f3efe2}
+  .hk-brand{display:flex;align-items:center;gap:10px;font-size:18px}
+  .hk-brand b{letter-spacing:.3px}
+  .hk-brand em{font-style:normal;opacity:.7;font-size:13px;padding-left:8px;border-left:1px solid #ffffff33}
+  .hk-logo{font-family:Georgia,serif;background:var(--gold);color:#211c0e;padding:3px 8px;border-radius:6px;font-size:14px}
+  .hk-ghost{background:transparent;border:1px solid #ffffff55;color:#f3efe2;padding:7px 14px;border-radius:8px;cursor:pointer}
+  .hk-ghost:hover{background:#ffffff1a}
+  /* nav */
+  .hk-nav{display:flex;gap:4px;flex-wrap:wrap;padding:10px 16px;background:#fffdf7cc;border-bottom:1px solid var(--line);position:sticky;top:0;z-index:5;backdrop-filter:blur(6px)}
+  .hk-navbtn{border:1px solid transparent;background:transparent;padding:8px 13px;border-radius:9px;cursor:pointer;font-size:13.5px;color:var(--ink2)}
+  .hk-navbtn:hover{background:#1f6f5410}
+  .hk-navbtn.on{background:var(--green);color:#fff}
+  .hk-main{max-width:1080px;margin:0 auto;padding:22px 18px 60px}
+  /* headers */
+  .hk-h{margin:4px 2px 16px}
+  .hk-h h1{font-size:26px;margin:0}
+  .hk-h p{margin:4px 0 0;color:var(--ink2);font-size:13.5px}
+  /* cards */
+  .hk-card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px 16px;margin-bottom:16px;box-shadow:0 1px 0 #00000005}
+  .hk-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:16px}
+  .hk-card.kpi{display:flex;flex-direction:column;gap:6px;padding:14px 16px}
+  .hk-card.kpi span{font-size:12.5px;color:var(--ink2);text-transform:uppercase;letter-spacing:.4px}
+  .hk-card.kpi b{font-size:20px}
+  .kpi.pos b{color:var(--pos)} .kpi.neg b{color:var(--neg)} .kpi.ap b,.kpi.vat b{color:var(--rust)} .kpi.ar b,.kpi.cash b{color:var(--green)}
+  .hk-rowhead{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+  .hk-rowhead b{font-size:15px}
+  .muted{color:#9a9483;font-size:12.5px}
+  .ok{color:var(--green);font-weight:600;font-size:13px} .bad{color:var(--rust);font-weight:600}
+  /* forms */
+  input,select{font-family:inherit;font-size:14px;padding:9px 11px;border:1px solid var(--line);border-radius:9px;background:#fff;color:var(--ink);width:100%}
+  input:focus,select:focus{outline:2px solid #1f6f5455;border-color:var(--green)}
+  .hk-form2{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px}
+  .hk-form4{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:10px}
+  .hk-form5{display:grid;grid-template-columns:2fr 1fr 1fr 1fr auto;gap:10px}
+  .hk-form6{display:grid;grid-template-columns:repeat(6,1fr);gap:10px}
+  .hk-btn{background:var(--green);color:#fff;border:none;padding:10px 16px;border-radius:9px;font-size:14px;cursor:pointer;white-space:nowrap}
+  .hk-btn:hover{background:var(--green2)}
+  .hk-btn.alt{background:#fff;color:var(--green);border:1px solid var(--green)}
+  .hk-btn.full{width:100%;margin-top:6px}
+  .hk-link{background:none;border:none;color:var(--teal);cursor:pointer;font-size:13px;padding:0}
+  .hk-x{background:none;border:none;color:var(--rust);cursor:pointer;font-size:12.5px}
+  .hk-quick{display:flex;gap:10px;flex-wrap:wrap}
+  .hk-check{display:flex;align-items:center;gap:8px;font-size:14px;margin:6px 0}
+  .hk-check input{width:auto}
+  /* table */
+  .hk-table{width:100%;border-collapse:collapse;font-size:13.5px}
+  .hk-table th{text-align:left;color:var(--ink2);font-weight:600;padding:8px 8px;border-bottom:2px solid var(--line);font-size:12px;text-transform:uppercase;letter-spacing:.3px}
+  .hk-table td{padding:8px 8px;border-bottom:1px solid #efeadd;vertical-align:top}
+  .hk-table tfoot td{border-top:2px solid var(--line);font-weight:700}
+  .hk-table .r{text-align:right} th.r{text-align:right}
+  .hk-table .mini{font-size:12px;color:var(--ink2)}
+  .amt{text-align:right}
+  /* summary box */
+  .hk-summary{background:#1f6f540d;border:1px solid #1f6f5422;border-radius:10px;padding:12px 14px;margin:10px 0}
+  .hk-summary div{display:flex;justify-content:space-between;padding:3px 0;font-size:14px}
+  .hk-summary .big{border-top:1px solid #1f6f5433;margin-top:6px;padding-top:8px;font-size:16px;font-weight:700}
+  /* report */
+  .report .hk-sec{margin-bottom:14px}
+  .hk-sech{font-family:Georgia,serif;font-size:15px;color:var(--green2);border-bottom:1px solid var(--line);padding-bottom:5px;margin-bottom:4px}
+  .hk-secrow{display:flex;justify-content:space-between;padding:5px 2px;font-size:14px;border-bottom:1px dashed #eee6d4}
+  .hk-secrow.tot{font-weight:700;border-bottom:none;border-top:1px solid var(--line);margin-top:2px}
+  .hk-net{display:flex;justify-content:space-between;align-items:center;padding:12px 14px;border-radius:10px;margin-top:8px;font-size:16px}
+  .hk-net.pos{background:#1f6f5414;color:var(--green2)} .hk-net.neg{background:#a23b2214;color:var(--rust)}
+  .hk-net b{font-size:18px}
+  /* mini tabs */
+  .hk-tabsmini{display:inline-flex;background:#fff;border:1px solid var(--line);border-radius:10px;padding:3px;margin-bottom:14px;gap:3px}
+  .hk-tabsmini button{border:none;background:transparent;padding:8px 16px;border-radius:8px;cursor:pointer;font-size:13.5px;color:var(--ink2)}
+  .hk-tabsmini button.on{background:var(--green);color:#fff}
+  .hk-empty{text-align:center;color:#9a9483;padding:26px;font-size:14px}
+  /* auth */
+  .hk-auth{display:flex;align-items:center;justify-content:center;padding:20px}
+  .hk-authcard{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:30px;max-width:380px;width:100%;box-shadow:0 18px 50px #10211b14}
+  .hk-authlogo{font-family:Georgia,serif;font-size:24px;display:flex;align-items:center;gap:10px;font-weight:700}
+  .hk-authlogo span{background:var(--gold);color:#211c0e;padding:4px 9px;border-radius:8px;font-size:18px}
+  .hk-authlogo.big{font-size:32px;justify-content:center;min-height:60vh;align-items:center}
+  .hk-authsub{color:var(--ink2);font-size:13.5px;margin:12px 0 16px}
+  .hk-authcard input{margin-bottom:10px}
+  .hk-tabsmini.auth{display:flex;width:100%;margin-bottom:14px}
+  .hk-tabsmini.auth button{flex:1}
+  .hk-authnote{font-size:11.5px;color:#9a9483;margin-top:12px;text-align:center}
+  /* toast */
+  .hk-toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--ink);color:#fff;padding:11px 20px;border-radius:10px;font-size:14px;z-index:50;box-shadow:0 8px 30px #00000030}
+  @media(max-width:760px){
+    .hk-form4,.hk-form5,.hk-form6{grid-template-columns:1fr 1fr}
+    .hk-form2{grid-template-columns:1fr}
+    .hk-main{padding:16px 12px 50px}
+  }
+  @media(prefers-reduced-motion:no-preference){.hk-card{transition:box-shadow .2s}}
+  `}</style>;
+}
+
+const rootEl = document.getElementById("root");
+ReactDOM.createRoot(rootEl).render(<App />);
+</script>
+</body>
+</html><!DOCTYPE html>
+<html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
