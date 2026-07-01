@@ -5095,7 +5095,25 @@ function RTrialBalance({
   }, Math.abs(td - tc) < 0.01 ? "Balanced ✓" : "Out by " + num(Math.abs(td - tc)))));
 }
 
-/* ============================ Profit & Loss (period) ============================ */
+/* ============================ Profit & Loss (period + prior comparison) ============================ */
+function addDays(adStr, n) {
+  const d = new Date(adStr + "T00:00:00Z");
+  d.setUTCDate(d.getUTCDate() + n);
+  return d.toISOString().slice(0, 10);
+}
+function priorPeriod(from, to) {
+  if (!from || !to) return {
+    from: null,
+    to: null
+  };
+  const len = Math.round((Date.parse(to) - Date.parse(from)) / 86400000); // days in period
+  const pTo = addDays(from, -1);
+  const pFrom = addDays(pTo, -len);
+  return {
+    from: pFrom,
+    to: pTo
+  };
+}
 function RProfitLoss({
   db,
   flash
@@ -5103,102 +5121,199 @@ function RProfitLoss({
   const d = fyDefaults(db);
   const [from, setFrom] = useState(d.from);
   const [to, setTo] = useState(d.to);
+  const [compare, setCompare] = useState(false);
   const L = useMemo(() => computeLedger(db, {
     from,
     to
   }), [db, from, to]);
-  const income = db.accounts.filter(a => a.type === "income").map(a => [a, L.bal[a.id] || 0]).filter(([, b]) => Math.abs(b) > 0.005);
-  const expense = db.accounts.filter(a => a.type === "expense").map(a => [a, L.bal[a.id] || 0]).filter(([, b]) => Math.abs(b) > 0.005);
+  const pp = useMemo(() => priorPeriod(from, to), [from, to]);
+  const LP = useMemo(() => compare ? computeLedger(db, {
+    from: pp.from,
+    to: pp.to
+  }) : null, [db, compare, pp]);
+  const rowsFor = type => db.accounts.filter(a => a.type === type).map(a => [a, L.bal[a.id] || 0, LP ? LP.bal[a.id] || 0 : null]).filter(([, b, pb]) => Math.abs(b) > 0.005 || pb != null && Math.abs(pb) > 0.005);
+  const income = rowsFor("income"),
+    expense = rowsFor("expense");
   const totInc = income.reduce((s, [, b]) => s + b, 0),
     totExp = expense.reduce((s, [, b]) => s + b, 0);
+  const totIncP = income.reduce((s, [,, pb]) => s + (pb || 0), 0),
+    totExpP = expense.reduce((s, [,, pb]) => s + (pb || 0), 0);
   const gp = (L.bal[acc(db, "4010").id] || 0) - (L.bal[acc(db, "5010").id] || 0);
-  const ni = totInc - totExp;
+  const ni = totInc - totExp,
+    niP = totIncP - totExpP;
   const csv = () => {
     const rows = [];
-    rows.push(["INCOME", ""]);
-    income.forEach(([a, b]) => rows.push([a.code + " " + a.name, b.toFixed(2)]));
-    rows.push(["Total Income", totInc.toFixed(2)]);
-    rows.push(["Gross Profit (Sales-COGS)", gp.toFixed(2)]);
-    rows.push(["EXPENSES", ""]);
-    expense.forEach(([a, b]) => rows.push([a.code + " " + a.name, b.toFixed(2)]));
-    rows.push(["Total Expenses", totExp.toFixed(2)]);
-    rows.push([ni >= 0 ? "NET PROFIT" : "NET LOSS", ni.toFixed(2)]);
-    exportCSV("profit-loss-" + from + "_to_" + to + ".csv", ["Account", "Amount"], rows);
+    const hdr = compare ? ["Account", "Amount", "Prior"] : ["Account", "Amount"];
+    const push = (label, v, pv) => rows.push(compare ? [label, (v || 0).toFixed(2), (pv || 0).toFixed(2)] : [label, (v || 0).toFixed(2)]);
+    rows.push(compare ? ["INCOME", "", ""] : ["INCOME", ""]);
+    income.forEach(([a, b, pb]) => push(a.code + " " + a.name, b, pb));
+    push("Total Income", totInc, totIncP);
+    push("Gross Profit (Sales-COGS)", gp, null);
+    rows.push(compare ? ["EXPENSES", "", ""] : ["EXPENSES", ""]);
+    expense.forEach(([a, b, pb]) => push(a.code + " " + a.name, b, pb));
+    push("Total Expenses", totExp, totExpP);
+    push(ni >= 0 ? "NET PROFIT" : "NET LOSS", ni, niP);
+    exportCSV("profit-loss-" + from + "_to_" + to + ".csv", hdr, rows);
     flash("Exported.");
   };
+  const SecC = ({
+    title,
+    rows,
+    total,
+    totalP
+  }) => /*#__PURE__*/React.createElement("div", {
+    className: "hk-sec"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "hk-sech"
+  }, title), rows.length === 0 ? /*#__PURE__*/React.createElement("div", {
+    className: "hk-secrow muted"
+  }, /*#__PURE__*/React.createElement("span", null, "\u2014"), /*#__PURE__*/React.createElement("span", null)) : rows.map(([a, b, pb], i) => /*#__PURE__*/React.createElement("div", {
+    className: "hk-secrow",
+    key: a.id || i
+  }, /*#__PURE__*/React.createElement("span", null, a.code ? a.code + " " : "", a.name), /*#__PURE__*/React.createElement("span", {
+    className: "hk-amt2"
+  }, NRS(b), compare && /*#__PURE__*/React.createElement("em", null, NRS(pb || 0))))), /*#__PURE__*/React.createElement("div", {
+    className: "hk-secrow tot"
+  }, /*#__PURE__*/React.createElement("span", null, "Total ", title), /*#__PURE__*/React.createElement("span", {
+    className: "hk-amt2"
+  }, NRS(total), compare && /*#__PURE__*/React.createElement("em", null, NRS(totalP)))));
   return /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement(H, {
     title: "Profit & Loss",
-    sub: "Income statement for the selected period."
-  }), /*#__PURE__*/React.createElement(PeriodBar, {
-    from: from,
-    to: to,
-    setFrom: setFrom,
-    setTo: setTo,
-    onCSV: csv
+    sub: "Income statement for the selected period, with optional prior-period comparison."
   }), /*#__PURE__*/React.createElement("div", {
+    className: "hk-repbar hk-noprint"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "hk-repfilters"
+  }, /*#__PURE__*/React.createElement("label", null, "From ", /*#__PURE__*/React.createElement("input", {
+    type: "date",
+    value: from,
+    onChange: e => setFrom(e.target.value)
+  })), /*#__PURE__*/React.createElement("label", null, "To ", /*#__PURE__*/React.createElement("input", {
+    type: "date",
+    value: to,
+    onChange: e => setTo(e.target.value)
+  })), /*#__PURE__*/React.createElement("label", {
+    className: "hk-inlinecheck"
+  }, /*#__PURE__*/React.createElement("input", {
+    type: "checkbox",
+    checked: compare,
+    onChange: e => setCompare(e.target.checked)
+  }), " compare prior period")), /*#__PURE__*/React.createElement("div", {
+    className: "hk-repactions"
+  }, /*#__PURE__*/React.createElement("button", {
+    className: "hk-btn alt",
+    onClick: csv
+  }, "\u2B07 Excel (CSV)"), /*#__PURE__*/React.createElement("button", {
+    className: "hk-btn",
+    onClick: () => window.print()
+  }, "\uD83D\uDDA8 PDF"))), /*#__PURE__*/React.createElement("div", {
     className: "hk-card report"
   }, /*#__PURE__*/React.createElement(ReportHead, {
     title: "Profit & Loss",
-    line: (db.profile.name || "") + " — " + from + " to " + to
-  }), /*#__PURE__*/React.createElement(Section, {
+    line: (db.profile.name || "") + " — " + from + " to " + to + (compare ? "  (prior: " + pp.from + " to " + pp.to + ")" : "")
+  }), compare && /*#__PURE__*/React.createElement("div", {
+    className: "hk-secrow colhdr"
+  }, /*#__PURE__*/React.createElement("span", null), /*#__PURE__*/React.createElement("span", {
+    className: "hk-amt2"
+  }, /*#__PURE__*/React.createElement("b", null, "Period"), /*#__PURE__*/React.createElement("em", null, "Prior"))), /*#__PURE__*/React.createElement(SecC, {
     title: "Income",
     rows: income,
-    total: totInc
-  }), /*#__PURE__*/React.createElement(Row, {
-    label: "Gross Profit (Sales \u2212 COGS)",
-    val: gp,
-    strong: true
-  }), /*#__PURE__*/React.createElement(Section, {
+    total: totInc,
+    totalP: totIncP
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "hk-secrow tot"
+  }, /*#__PURE__*/React.createElement("span", null, "Gross Profit (Sales \u2212 COGS)"), /*#__PURE__*/React.createElement("span", null, NRS(gp))), /*#__PURE__*/React.createElement(SecC, {
     title: "Expenses",
     rows: expense,
-    total: totExp
+    total: totExp,
+    totalP: totExpP
   }), /*#__PURE__*/React.createElement("div", {
     className: "hk-net " + (ni >= 0 ? "pos" : "neg")
-  }, /*#__PURE__*/React.createElement("span", null, "Net ", ni >= 0 ? "Profit" : "Loss"), /*#__PURE__*/React.createElement("b", null, NRS(ni)))));
+  }, /*#__PURE__*/React.createElement("span", null, "Net ", ni >= 0 ? "Profit" : "Loss"), /*#__PURE__*/React.createElement("span", {
+    className: "hk-amt2"
+  }, /*#__PURE__*/React.createElement("b", null, NRS(ni)), compare && /*#__PURE__*/React.createElement("em", null, NRS(niP))))));
 }
 
-/* ============================ Balance Sheet (as-on) ============================ */
+/* ============================ Balance Sheet (as-on, split earnings) ============================ */
 function RBalanceSheet({
   db,
   flash
 }) {
   const d = fyDefaults(db);
   const [ason, setAson] = useState(d.ason);
+  const [from, setFrom] = useState(d.from); // start of current period (fiscal year start)
+  // balances as-on the date (all entries up to 'ason')
   const L = useMemo(() => computeLedger(db, {
     to: ason
   }), [db, ason]);
-  const ni = netIncome(L, db);
+  // current-period profit = net income between 'from' and 'ason'
+  const Lcur = useMemo(() => computeLedger(db, {
+    from,
+    to: ason
+  }), [db, from, ason]);
+  const totalNI = netIncome(L, db); // all profit up to as-on date
+  const curNI = netIncome(Lcur, db); // profit within the current period
+  const openNI = totalNI - curNI; // retained earnings brought forward
+
   const assets = db.accounts.filter(a => a.type === "asset").map(a => [a, (a.contra ? -1 : 1) * (L.bal[a.id] || 0)]).filter(([, b]) => Math.abs(b) > 0.005);
   const liab = db.accounts.filter(a => a.type === "liability").map(a => [a, L.bal[a.id] || 0]).filter(([, b]) => Math.abs(b) > 0.005);
   const eq = db.accounts.filter(a => a.type === "equity").map(a => [a, (a.contra ? -1 : 1) * (L.bal[a.id] || 0)]).filter(([, b]) => Math.abs(b) > 0.005);
   const totA = assets.reduce((s, [, b]) => s + b, 0),
-    totL = liab.reduce((s, [, b]) => s + b, 0),
-    totE = eq.reduce((s, [, b]) => s + b, 0) + ni;
+    totL = liab.reduce((s, [, b]) => s + b, 0);
+  const eqRows = [...eq];
+  if (Math.abs(openNI) > 0.005) eqRows.push([{
+    id: "openni",
+    code: "",
+    name: "Opening Retained Earnings"
+  }, openNI]);
+  eqRows.push([{
+    id: "curni",
+    code: "",
+    name: "Current Period Earnings"
+  }, curNI]);
+  const totE = eq.reduce((s, [, b]) => s + b, 0) + openNI + curNI;
   const diff = totA - (totL + totE);
   const csv = () => {
     const rows = [];
     const sec = (t, list) => {
       rows.push([t.toUpperCase(), ""]);
-      list.forEach(([a, b]) => rows.push([a.code + " " + a.name, b.toFixed(2)]));
+      list.forEach(([a, b]) => rows.push([(a.code ? a.code + " " : "") + a.name, b.toFixed(2)]));
     };
     sec("Assets", assets);
     rows.push(["Total Assets", totA.toFixed(2)]);
     sec("Liabilities", liab);
     rows.push(["Total Liabilities", totL.toFixed(2)]);
-    sec("Equity", eq);
-    rows.push(["Current Period Earnings", ni.toFixed(2)]);
+    sec("Equity", eqRows);
     rows.push(["Total Equity", totE.toFixed(2)]);
     exportCSV("balance-sheet-" + ason + ".csv", ["Account", "Amount"], rows);
     flash("Exported.");
   };
   return /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement(H, {
     title: "Balance Sheet",
-    sub: "Financial position as on a chosen date."
-  }), /*#__PURE__*/React.createElement(AsOnBar, {
-    ason: ason,
-    setAson: setAson,
-    onCSV: csv
+    sub: "Financial position as on a date, with earnings split into opening and current period."
   }), /*#__PURE__*/React.createElement("div", {
+    className: "hk-repbar hk-noprint"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "hk-repfilters"
+  }, /*#__PURE__*/React.createElement("label", null, "Period from ", /*#__PURE__*/React.createElement("input", {
+    type: "date",
+    value: from,
+    onChange: e => setFrom(e.target.value)
+  })), /*#__PURE__*/React.createElement("label", null, "As on ", /*#__PURE__*/React.createElement("input", {
+    type: "date",
+    value: ason,
+    onChange: e => setAson(e.target.value)
+  })), /*#__PURE__*/React.createElement("span", {
+    className: "hk-bsmini"
+  }, bsLabel(ason))), /*#__PURE__*/React.createElement("div", {
+    className: "hk-repactions"
+  }, /*#__PURE__*/React.createElement("button", {
+    className: "hk-btn alt",
+    onClick: csv
+  }, "\u2B07 Excel (CSV)"), /*#__PURE__*/React.createElement("button", {
+    className: "hk-btn",
+    onClick: () => window.print()
+  }, "\uD83D\uDDA8 PDF"))), /*#__PURE__*/React.createElement("div", {
     className: "hk-card report"
   }, /*#__PURE__*/React.createElement(ReportHead, {
     title: "Balance Sheet",
@@ -5213,11 +5328,7 @@ function RBalanceSheet({
     total: totL
   }), /*#__PURE__*/React.createElement(Section, {
     title: "Equity",
-    rows: [...eq, [{
-      id: "ni",
-      code: "",
-      name: "Current Period Earnings"
-    }, ni]],
+    rows: eqRows,
     total: totE
   }), /*#__PURE__*/React.createElement("div", {
     className: "hk-net " + (Math.abs(diff) < 0.01 ? "pos" : "neg")
@@ -5515,6 +5626,11 @@ function Style() {
   .hk-repfilters input{width:auto}
   .hk-bsmini{font-size:11.5px;color:var(--teal)}
   .hk-repactions{display:flex;gap:8px}
+  .hk-inlinecheck{display:flex;gap:6px;align-items:center}.hk-inlinecheck input{width:auto}
+  .hk-amt2{display:inline-flex;gap:16px;align-items:baseline;justify-content:flex-end;min-width:200px}
+  .hk-amt2 em{font-style:normal;color:var(--ink2);font-size:12.5px;min-width:90px;text-align:right}
+  .hk-secrow.colhdr{border-bottom:1px solid var(--line)}
+  .hk-secrow.colhdr em{font-style:normal}
   .hk-printonly{display:none}
   .hk-rephead h2{font-family:Georgia,serif;margin:0 0 2px;color:var(--green)}
   .hk-repco{color:var(--ink2);font-size:13px;margin-bottom:10px}
