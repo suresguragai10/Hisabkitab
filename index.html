@@ -758,7 +758,10 @@ function migrate(db) {
     },
     accounts: Array.isArray(db.accounts) && db.accounts.length ? db.accounts : base.accounts,
     journal: Array.isArray(db.journal) ? db.journal : [],
-    items: Array.isArray(db.items) ? db.items : [],
+    items: Array.isArray(db.items) ? db.items.map(i => ({
+      category: "Uncategorised",
+      ...i
+    })) : [],
     parties: Array.isArray(db.parties) ? db.parties : [],
     assets: Array.isArray(db.assets) ? db.assets : [],
     setupDone: db.setupDone === true
@@ -905,7 +908,7 @@ function App() {
     saveDb,
     flash
   };
-  const tabs = [["dashboard", "Dashboard"], ["vouchers", "Vouchers"], ["invoices", "Invoices"], ["receive", "Receive Payment"], ["journalbook", "Day Book"], ["coa", "Chart of Accounts"], ["inventory", "Inventory"], ["parties", "Debtors / Creditors"], ["ledger", "Party Ledger"], ["aging", "Aging"], ["assets", "Fixed Assets"], ["pl", "Profit & Loss"], ["bs", "Balance Sheet"], ["cf", "Cash Flow"], ["vat", "VAT Books"], ["settings", "Settings"]];
+  const tabs = [["dashboard", "Dashboard"], ["vouchers", "Vouchers"], ["invoices", "Invoices"], ["bills", "Bills"], ["receive", "Receive Payment"], ["makepay", "Make Payment"], ["journalbook", "Day Book"], ["coa", "Chart of Accounts"], ["inventory", "Inventory"], ["stockledger", "Stock Ledger"], ["valuation", "Stock Valuation"], ["parties", "Debtors / Creditors"], ["ledger", "Party Ledger"], ["aging", "Aging"], ["assets", "Fixed Assets"], ["pl", "Profit & Loss"], ["bs", "Balance Sheet"], ["cf", "Cash Flow"], ["vat", "VAT Books"], ["settings", "Settings"]];
   return /*#__PURE__*/React.createElement("div", {
     className: "hk-root"
   }, /*#__PURE__*/React.createElement(Style, null), /*#__PURE__*/React.createElement("header", {
@@ -934,7 +937,7 @@ function App() {
     className: "hk-main"
   }, tab === "dashboard" && /*#__PURE__*/React.createElement(Dashboard, _extends({}, ctx, {
     go: setTab
-  })), tab === "vouchers" && /*#__PURE__*/React.createElement(Vouchers, ctx), tab === "invoices" && /*#__PURE__*/React.createElement(Invoices, ctx), tab === "receive" && /*#__PURE__*/React.createElement(ReceivePayment, ctx), tab === "settings" && /*#__PURE__*/React.createElement(Settings, ctx), tab === "ledger" && /*#__PURE__*/React.createElement(PartyLedger, ctx), tab === "aging" && /*#__PURE__*/React.createElement(Aging, ctx), tab === "journalbook" && /*#__PURE__*/React.createElement(DayBook, ctx), tab === "coa" && /*#__PURE__*/React.createElement(COA, ctx), tab === "inventory" && /*#__PURE__*/React.createElement(Inventory, ctx), tab === "parties" && /*#__PURE__*/React.createElement(Parties, ctx), tab === "assets" && /*#__PURE__*/React.createElement(Assets, ctx), tab === "pl" && /*#__PURE__*/React.createElement(ProfitLoss, ctx), tab === "bs" && /*#__PURE__*/React.createElement(BalanceSheet, ctx), tab === "cf" && /*#__PURE__*/React.createElement(CashFlow, ctx), tab === "vat" && /*#__PURE__*/React.createElement(VatBooks, ctx)), toast && /*#__PURE__*/React.createElement("div", {
+  })), tab === "vouchers" && /*#__PURE__*/React.createElement(Vouchers, ctx), tab === "invoices" && /*#__PURE__*/React.createElement(Invoices, ctx), tab === "receive" && /*#__PURE__*/React.createElement(ReceivePayment, ctx), tab === "bills" && /*#__PURE__*/React.createElement(Bills, ctx), tab === "makepay" && /*#__PURE__*/React.createElement(MakePayment, ctx), tab === "stockledger" && /*#__PURE__*/React.createElement(StockLedger, ctx), tab === "valuation" && /*#__PURE__*/React.createElement(StockValuation, ctx), tab === "settings" && /*#__PURE__*/React.createElement(Settings, ctx), tab === "ledger" && /*#__PURE__*/React.createElement(PartyLedger, ctx), tab === "aging" && /*#__PURE__*/React.createElement(Aging, ctx), tab === "journalbook" && /*#__PURE__*/React.createElement(DayBook, ctx), tab === "coa" && /*#__PURE__*/React.createElement(COA, ctx), tab === "inventory" && /*#__PURE__*/React.createElement(Inventory, ctx), tab === "parties" && /*#__PURE__*/React.createElement(Parties, ctx), tab === "assets" && /*#__PURE__*/React.createElement(Assets, ctx), tab === "pl" && /*#__PURE__*/React.createElement(ProfitLoss, ctx), tab === "bs" && /*#__PURE__*/React.createElement(BalanceSheet, ctx), tab === "cf" && /*#__PURE__*/React.createElement(CashFlow, ctx), tab === "vat" && /*#__PURE__*/React.createElement(VatBooks, ctx)), toast && /*#__PURE__*/React.createElement("div", {
     className: "hk-toast"
   }, toast));
 }
@@ -2585,6 +2588,7 @@ function Inventory({
 }) {
   const [f, setF] = useState({
     name: "",
+    category: "",
     unit: "pcs",
     cost: "",
     price: ""
@@ -2596,6 +2600,7 @@ function Inventory({
       items: [...db.items, {
         id: uid(),
         name: f.name,
+        category: f.category || "Uncategorised",
         unit: f.unit,
         cost: Number(f.cost) || 0,
         price: Number(f.price) || 0,
@@ -2604,6 +2609,7 @@ function Inventory({
     });
     setF({
       name: "",
+      category: f.category,
       unit: "pcs",
       cost: "",
       price: ""
@@ -2614,13 +2620,14 @@ function Inventory({
     ...db,
     items: db.items.filter(x => x.id !== id)
   });
+  const cats = [...new Set(db.items.map(i => i.category || "Uncategorised"))];
   return /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement(H, {
     title: "Inventory",
     sub: "Stock updates automatically from sales, purchases and returns."
   }), /*#__PURE__*/React.createElement("div", {
     className: "hk-card"
   }, /*#__PURE__*/React.createElement("div", {
-    className: "hk-form5"
+    className: "hk-form6"
   }, /*#__PURE__*/React.createElement("input", {
     placeholder: "Item name",
     value: f.name,
@@ -2629,6 +2636,19 @@ function Inventory({
       name: e.target.value
     })
   }), /*#__PURE__*/React.createElement("input", {
+    placeholder: "Category",
+    list: "hk-cats",
+    value: f.category,
+    onChange: e => setF({
+      ...f,
+      category: e.target.value
+    })
+  }), /*#__PURE__*/React.createElement("datalist", {
+    id: "hk-cats"
+  }, cats.map(c => /*#__PURE__*/React.createElement("option", {
+    key: c,
+    value: c
+  }))), /*#__PURE__*/React.createElement("input", {
     placeholder: "Unit",
     value: f.unit,
     onChange: e => setF({
@@ -2660,7 +2680,7 @@ function Inventory({
     msg: "No items yet."
   }) : /*#__PURE__*/React.createElement("table", {
     className: "hk-table"
-  }, /*#__PURE__*/React.createElement("thead", null, /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("th", null, "Item"), /*#__PURE__*/React.createElement("th", {
+  }, /*#__PURE__*/React.createElement("thead", null, /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("th", null, "Item"), /*#__PURE__*/React.createElement("th", null, "Category"), /*#__PURE__*/React.createElement("th", {
     className: "r"
   }, "Stock"), /*#__PURE__*/React.createElement("th", null, "Unit"), /*#__PURE__*/React.createElement("th", {
     className: "r"
@@ -2673,6 +2693,8 @@ function Inventory({
   }, /*#__PURE__*/React.createElement("td", null, i.name, i.qty <= 0 && /*#__PURE__*/React.createElement("span", {
     className: "hk-tag warn"
   }, "low")), /*#__PURE__*/React.createElement("td", {
+    className: "muted"
+  }, i.category || "Uncategorised"), /*#__PURE__*/React.createElement("td", {
     className: "r" + (i.qty <= 0 ? " bad" : "")
   }, num(i.qty)), /*#__PURE__*/React.createElement("td", null, i.unit), /*#__PURE__*/React.createElement("td", {
     className: "r"
@@ -3862,6 +3884,478 @@ function ReceivePayment({
       onClick: () => receive(inv)
     }, "Receive")));
   })))));
+}
+/* ============================ Bills (purchases list) ============================ */
+function paidForBill(db, billId) {
+  return db.journal.filter(e => e.ref === "PMT" && e.paidFor === billId).reduce((s, e) => s + (Number(e.amount) || 0), 0);
+}
+function billStatus(db, entry) {
+  const total = entry.meta ? entry.meta.total : 0;
+  const paid = paidForBill(db, entry.id);
+  const due = Math.max(0, total - paid);
+  let label = "Unpaid";
+  if (paid >= total - 0.005 && total > 0) label = "Paid";else if (paid > 0.005) label = "Partial";
+  return {
+    total,
+    paid,
+    due,
+    label
+  };
+}
+function Bills({
+  db
+}) {
+  const [openId, setOpenId] = useState(null);
+  const bills = db.journal.filter(e => e.ref === "BILL").sort((a, b) => b.date.localeCompare(a.date));
+  const open = bills.find(e => e.id === openId);
+  if (open) return /*#__PURE__*/React.createElement(BillView, {
+    db: db,
+    entry: open,
+    onBack: () => setOpenId(null)
+  });
+  const apId = acc(db, "2010").id;
+  return /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement(H, {
+    title: "Purchase Bills",
+    sub: "Every purchase bill with paid / due status."
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "hk-card"
+  }, bills.length === 0 ? /*#__PURE__*/React.createElement(Empty, {
+    msg: "No bills yet. Create a Purchase under Vouchers."
+  }) : /*#__PURE__*/React.createElement("table", {
+    className: "hk-table"
+  }, /*#__PURE__*/React.createElement("thead", null, /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("th", null, "Date"), /*#__PURE__*/React.createElement("th", null, "BS"), /*#__PURE__*/React.createElement("th", null, "Supplier"), /*#__PURE__*/React.createElement("th", {
+    className: "r"
+  }, "Total"), /*#__PURE__*/React.createElement("th", {
+    className: "r"
+  }, "Due"), /*#__PURE__*/React.createElement("th", null, "Status"), /*#__PURE__*/React.createElement("th", null))), /*#__PURE__*/React.createElement("tbody", null, bills.map(e => {
+    const party = db.parties.find(p => p.id === e.partyId);
+    const st = billStatus(db, e);
+    const isCredit = e.lines.some(l => l.accId === apId && Number(l.credit) > 0);
+    return /*#__PURE__*/React.createElement("tr", {
+      key: e.id
+    }, /*#__PURE__*/React.createElement("td", null, e.date), /*#__PURE__*/React.createElement("td", {
+      className: "muted"
+    }, bsLabel(e.date)), /*#__PURE__*/React.createElement("td", null, party ? party.name : "Cash purchase"), /*#__PURE__*/React.createElement("td", {
+      className: "r"
+    }, NRS(st.total)), /*#__PURE__*/React.createElement("td", {
+      className: "r"
+    }, isCredit ? num(st.due) : "—"), /*#__PURE__*/React.createElement("td", null, isCredit ? /*#__PURE__*/React.createElement("span", {
+      className: "hk-status " + st.label.toLowerCase()
+    }, st.label) : /*#__PURE__*/React.createElement("span", {
+      className: "muted"
+    }, "cash")), /*#__PURE__*/React.createElement("td", {
+      className: "r"
+    }, /*#__PURE__*/React.createElement("button", {
+      className: "hk-link",
+      onClick: () => setOpenId(e.id)
+    }, "open")));
+  })))));
+}
+function BillView({
+  db,
+  entry,
+  onBack
+}) {
+  const p = db.profile || {};
+  const party = db.parties.find(x => x.id === entry.partyId);
+  const m = entry.meta || {};
+  const items = m.items && m.items.length ? m.items.map(it => ({
+    name: it.itemName,
+    unit: it.unit || "",
+    qty: it.qty || 0,
+    rate: it.rate || 0,
+    amount: it.amount || 0
+  })) : [{
+    name: entry.memo,
+    unit: "",
+    qty: m.qty || 0,
+    rate: m.rate || 0,
+    amount: m.base || 0
+  }];
+  const st = billStatus(db, entry);
+  return /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    className: "hk-noprint hk-rowhead"
+  }, /*#__PURE__*/React.createElement("button", {
+    className: "hk-btn alt",
+    onClick: onBack
+  }, "\u2190 Back"), /*#__PURE__*/React.createElement("button", {
+    className: "hk-btn",
+    onClick: () => window.print()
+  }, "\uD83D\uDDA8 Print / Save PDF")), /*#__PURE__*/React.createElement("div", {
+    className: "hk-invoice"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "hk-inv-head"
+  }, /*#__PURE__*/React.createElement("div", null, p.logo ? /*#__PURE__*/React.createElement("img", {
+    src: p.logo,
+    className: "hk-inv-logo",
+    alt: ""
+  }) : /*#__PURE__*/React.createElement("div", {
+    className: "hk-inv-logoph"
+  }, (p.name || "HK").slice(0, 2).toUpperCase())), /*#__PURE__*/React.createElement("div", {
+    className: "hk-inv-co"
+  }, /*#__PURE__*/React.createElement("h2", null, p.name || "Company"), /*#__PURE__*/React.createElement("div", null, p.address || ""), /*#__PURE__*/React.createElement("div", null, p.vatRegistered ? "VAT No." : "PAN No.", ": ", /*#__PURE__*/React.createElement("b", null, p.pan || "—"))), /*#__PURE__*/React.createElement("div", {
+    className: "hk-inv-title"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "hk-inv-tax"
+  }, "PURCHASE BILL"), /*#__PURE__*/React.createElement("table", {
+    className: "hk-inv-meta"
+  }, /*#__PURE__*/React.createElement("tbody", null, /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("td", null, "Date (AD)"), /*#__PURE__*/React.createElement("td", null, entry.date)), /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("td", null, "Date (BS)"), /*#__PURE__*/React.createElement("td", null, bsLabel(entry.date))), /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("td", null, "Status"), /*#__PURE__*/React.createElement("td", null, /*#__PURE__*/React.createElement("b", null, st.label))))))), /*#__PURE__*/React.createElement("div", {
+    className: "hk-inv-bill"
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("span", {
+    className: "hk-inv-lbl"
+  }, "Supplier"), /*#__PURE__*/React.createElement("div", {
+    className: "hk-inv-cust"
+  }, /*#__PURE__*/React.createElement("b", null, party ? party.name : "Cash Supplier"), party && party.pan ? /*#__PURE__*/React.createElement("div", null, "PAN/VAT: ", party.pan) : null))), /*#__PURE__*/React.createElement("table", {
+    className: "hk-inv-items"
+  }, /*#__PURE__*/React.createElement("thead", null, /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("th", null, "#"), /*#__PURE__*/React.createElement("th", null, "Description"), /*#__PURE__*/React.createElement("th", {
+    className: "r"
+  }, "Qty"), /*#__PURE__*/React.createElement("th", null, "Unit"), /*#__PURE__*/React.createElement("th", {
+    className: "r"
+  }, "Rate"), /*#__PURE__*/React.createElement("th", {
+    className: "r"
+  }, "Amount"))), /*#__PURE__*/React.createElement("tbody", null, items.map((it, i) => /*#__PURE__*/React.createElement("tr", {
+    key: i
+  }, /*#__PURE__*/React.createElement("td", null, i + 1), /*#__PURE__*/React.createElement("td", null, it.name), /*#__PURE__*/React.createElement("td", {
+    className: "r"
+  }, num(it.qty)), /*#__PURE__*/React.createElement("td", null, it.unit), /*#__PURE__*/React.createElement("td", {
+    className: "r"
+  }, num(it.rate)), /*#__PURE__*/React.createElement("td", {
+    className: "r"
+  }, num(it.amount)))))), /*#__PURE__*/React.createElement("div", {
+    className: "hk-inv-totals"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "hk-inv-words"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "hk-inv-lbl"
+  }, "Amount in words"), /*#__PURE__*/React.createElement("div", null, inWords(m.total || 0))), /*#__PURE__*/React.createElement("table", {
+    className: "hk-inv-sum"
+  }, /*#__PURE__*/React.createElement("tbody", null, /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("td", null, "Taxable"), /*#__PURE__*/React.createElement("td", {
+    className: "r"
+  }, NRS(m.base || 0))), m.vatApplied ? /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("td", null, "VAT @ 13%"), /*#__PURE__*/React.createElement("td", {
+    className: "r"
+  }, NRS(m.vatAmt || 0))) : null, /*#__PURE__*/React.createElement("tr", {
+    className: "grand"
+  }, /*#__PURE__*/React.createElement("td", null, "Grand Total"), /*#__PURE__*/React.createElement("td", {
+    className: "r"
+  }, NRS(m.total || 0))), st.paid > 0 ? /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("td", null, "Paid"), /*#__PURE__*/React.createElement("td", {
+    className: "r"
+  }, NRS(st.paid))) : null, st.due > 0 ? /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("td", null, "Due"), /*#__PURE__*/React.createElement("td", {
+    className: "r"
+  }, NRS(st.due))) : null)))));
+}
+
+/* ============================ Make Payment (to supplier) ============================ */
+function MakePayment({
+  db,
+  saveDb,
+  flash
+}) {
+  const [pid, setPid] = useState("");
+  const supplier = db.parties.find(p => p.id === pid && p.kind === "supplier");
+  const apId = acc(db, "2010").id;
+  const bills = db.journal.filter(e => e.ref === "BILL" && e.partyId === pid && e.lines.some(l => l.accId === apId && Number(l.credit) > 0));
+  const [form, setForm] = useState({});
+  const setF = (billId, k, v) => setForm({
+    ...form,
+    [billId]: {
+      ...(form[billId] || {
+        via: "1010"
+      }),
+      [k]: v
+    }
+  });
+  const pay = bill => {
+    const st = billStatus(db, bill);
+    const fv = form[bill.id] || {};
+    const amount = Number(fv.amount) || st.due;
+    if (amount <= 0) return flash("Enter an amount.");
+    if (amount > st.due + 0.005) return flash("Amount exceeds due (" + num(st.due) + ").");
+    const via = fv.via || "1010";
+    const A = c => acc(db, c).id;
+    const lines = [{
+      accId: apId,
+      debit: amount,
+      credit: 0
+    }, {
+      accId: A(via),
+      debit: 0,
+      credit: amount
+    }];
+    saveDb({
+      ...db,
+      journal: [...db.journal, {
+        id: uid(),
+        date: today(),
+        ref: "PMT",
+        memo: "Payment to " + (supplier ? supplier.name : "supplier"),
+        partyId: pid,
+        paidFor: bill.id,
+        amount,
+        lines
+      }]
+    });
+    setForm({
+      ...form,
+      [bill.id]: {
+        ...fv,
+        amount: ""
+      }
+    });
+    flash("Paid " + NRS(amount) + ".");
+  };
+  return /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement(H, {
+    title: "Make Payment",
+    sub: "Pay a supplier against a specific credit bill."
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "hk-card"
+  }, /*#__PURE__*/React.createElement(Field, {
+    label: "Supplier"
+  }, /*#__PURE__*/React.createElement("select", {
+    value: pid,
+    onChange: e => setPid(e.target.value)
+  }, /*#__PURE__*/React.createElement("option", {
+    value: ""
+  }, "\u2014 choose \u2014"), db.parties.filter(p => p.kind === "supplier").map(p => /*#__PURE__*/React.createElement("option", {
+    key: p.id,
+    value: p.id
+  }, p.name))))), supplier && /*#__PURE__*/React.createElement("div", {
+    className: "hk-card"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "hk-rowhead"
+  }, /*#__PURE__*/React.createElement("b", null, supplier.name, " \u2014 credit bills")), bills.length === 0 ? /*#__PURE__*/React.createElement(Empty, {
+    msg: "No credit bills for this supplier."
+  }) : /*#__PURE__*/React.createElement("table", {
+    className: "hk-table"
+  }, /*#__PURE__*/React.createElement("thead", null, /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("th", null, "Date"), /*#__PURE__*/React.createElement("th", {
+    className: "r"
+  }, "Total"), /*#__PURE__*/React.createElement("th", {
+    className: "r"
+  }, "Paid"), /*#__PURE__*/React.createElement("th", {
+    className: "r"
+  }, "Due"), /*#__PURE__*/React.createElement("th", null, "Status"), /*#__PURE__*/React.createElement("th", {
+    className: "r"
+  }, "Pay"), /*#__PURE__*/React.createElement("th", null))), /*#__PURE__*/React.createElement("tbody", null, bills.map(bill => {
+    const st = billStatus(db, bill);
+    const fv = form[bill.id] || {};
+    return /*#__PURE__*/React.createElement("tr", {
+      key: bill.id
+    }, /*#__PURE__*/React.createElement("td", null, bill.date), /*#__PURE__*/React.createElement("td", {
+      className: "r"
+    }, num(st.total)), /*#__PURE__*/React.createElement("td", {
+      className: "r"
+    }, num(st.paid)), /*#__PURE__*/React.createElement("td", {
+      className: "r"
+    }, /*#__PURE__*/React.createElement("b", null, num(st.due))), /*#__PURE__*/React.createElement("td", null, /*#__PURE__*/React.createElement("span", {
+      className: "hk-status " + st.label.toLowerCase()
+    }, st.label)), /*#__PURE__*/React.createElement("td", {
+      className: "r"
+    }, st.due > 0.005 ? /*#__PURE__*/React.createElement("div", {
+      className: "hk-payrow"
+    }, /*#__PURE__*/React.createElement("input", {
+      className: "amt",
+      type: "number",
+      placeholder: num(st.due),
+      value: fv.amount || "",
+      onChange: e => setF(bill.id, "amount", e.target.value)
+    }), /*#__PURE__*/React.createElement("select", {
+      value: fv.via || "1010",
+      onChange: e => setF(bill.id, "via", e.target.value)
+    }, /*#__PURE__*/React.createElement("option", {
+      value: "1010"
+    }, "Cash"), /*#__PURE__*/React.createElement("option", {
+      value: "1020"
+    }, "Bank"))) : /*#__PURE__*/React.createElement("span", {
+      className: "muted"
+    }, "settled")), /*#__PURE__*/React.createElement("td", {
+      className: "r"
+    }, st.due > 0.005 && /*#__PURE__*/React.createElement("button", {
+      className: "hk-btn small",
+      onClick: () => pay(bill)
+    }, "Pay")));
+  })))));
+}
+
+/* ============================ Inventory Ledger + Valuation ============================ */
+function itemMovements(db, itemId) {
+  // reconstruct in/out from journal meta.items; INV/CN affect sales side, BILL/DN purchase side
+  const moves = [];
+  db.journal.forEach(e => {
+    const m = e.meta;
+    if (!m || !m.items) {
+      // legacy single-item shape
+      if (m && m.itemId === itemId) {
+        const q = Number(m.qty) || 0;
+        if (e.ref === "INV") moves.push({
+          date: e.date,
+          ref: e.ref,
+          inQty: 0,
+          outQty: q,
+          rate: m.rate
+        });else if (e.ref === "BILL") moves.push({
+          date: e.date,
+          ref: e.ref,
+          inQty: q,
+          outQty: 0,
+          rate: m.rate
+        });
+      }
+      return;
+    }
+    m.items.filter(it => it.itemId === itemId).forEach(it => {
+      const q = Number(it.qty) || 0;
+      if (e.ref === "INV") moves.push({
+        date: e.date,
+        ref: e.ref,
+        inQty: 0,
+        outQty: q,
+        rate: it.rate
+      });else if (e.ref === "BILL") moves.push({
+        date: e.date,
+        ref: e.ref,
+        inQty: q,
+        outQty: 0,
+        rate: it.rate
+      });else if (e.ref === "CN") moves.push({
+        date: e.date,
+        ref: e.ref,
+        inQty: q,
+        outQty: 0,
+        rate: it.rate
+      }); // sales return: stock back in
+      else if (e.ref === "DN") moves.push({
+        date: e.date,
+        ref: e.ref,
+        inQty: 0,
+        outQty: q,
+        rate: it.rate
+      }); // purchase return: stock out
+    });
+  });
+  moves.sort((a, b) => a.date.localeCompare(b.date));
+  let bal = 0;
+  return moves.map(mv => {
+    bal += mv.inQty - mv.outQty;
+    return {
+      ...mv,
+      bal
+    };
+  });
+}
+function StockLedger({
+  db
+}) {
+  const [iid, setIid] = useState("");
+  const item = db.items.find(i => i.id === iid);
+  const moves = useMemo(() => item ? itemMovements(db, iid) : [], [iid, db]);
+  return /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement(H, {
+    title: "Stock Ledger",
+    sub: "Every movement in and out for an item, with running balance."
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "hk-card"
+  }, /*#__PURE__*/React.createElement(Field, {
+    label: "Select item"
+  }, /*#__PURE__*/React.createElement("select", {
+    value: iid,
+    onChange: e => setIid(e.target.value)
+  }, /*#__PURE__*/React.createElement("option", {
+    value: ""
+  }, "\u2014 choose \u2014"), db.items.map(i => /*#__PURE__*/React.createElement("option", {
+    key: i.id,
+    value: i.id
+  }, i.name))))), item && /*#__PURE__*/React.createElement("div", {
+    className: "hk-card"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "hk-rowhead"
+  }, /*#__PURE__*/React.createElement("b", null, item.name), /*#__PURE__*/React.createElement("span", {
+    className: "muted"
+  }, "current stock ", num(item.qty), " ", item.unit, " \xB7 cost ", num(item.cost))), moves.length === 0 ? /*#__PURE__*/React.createElement(Empty, {
+    msg: "No movements recorded."
+  }) : /*#__PURE__*/React.createElement("table", {
+    className: "hk-table"
+  }, /*#__PURE__*/React.createElement("thead", null, /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("th", null, "Date"), /*#__PURE__*/React.createElement("th", null, "BS"), /*#__PURE__*/React.createElement("th", null, "Ref"), /*#__PURE__*/React.createElement("th", {
+    className: "r"
+  }, "In"), /*#__PURE__*/React.createElement("th", {
+    className: "r"
+  }, "Out"), /*#__PURE__*/React.createElement("th", {
+    className: "r"
+  }, "Rate"), /*#__PURE__*/React.createElement("th", {
+    className: "r"
+  }, "Balance"))), /*#__PURE__*/React.createElement("tbody", null, moves.map((mv, i) => /*#__PURE__*/React.createElement("tr", {
+    key: i
+  }, /*#__PURE__*/React.createElement("td", null, mv.date), /*#__PURE__*/React.createElement("td", {
+    className: "muted"
+  }, bsLabel(mv.date)), /*#__PURE__*/React.createElement("td", null, mv.ref), /*#__PURE__*/React.createElement("td", {
+    className: "r"
+  }, mv.inQty ? num(mv.inQty) : ""), /*#__PURE__*/React.createElement("td", {
+    className: "r"
+  }, mv.outQty ? num(mv.outQty) : ""), /*#__PURE__*/React.createElement("td", {
+    className: "r"
+  }, mv.rate ? num(mv.rate) : ""), /*#__PURE__*/React.createElement("td", {
+    className: "r"
+  }, /*#__PURE__*/React.createElement("b", null, num(mv.bal)))))))));
+}
+function StockValuation({
+  db
+}) {
+  const cats = {};
+  db.items.forEach(i => {
+    const c = i.category || "Uncategorised";
+    (cats[c] = cats[c] || []).push(i);
+  });
+  let grandQty = 0,
+    grandVal = 0;
+  return /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement(H, {
+    title: "Stock Valuation",
+    sub: "Inventory value by category (quantity \xD7 cost)."
+  }), Object.keys(cats).sort().map(cat => {
+    const list = cats[cat];
+    let cq = 0,
+      cv = 0;
+    const rows = list.map(i => {
+      const v = (Number(i.qty) || 0) * (Number(i.cost) || 0);
+      cq += Number(i.qty) || 0;
+      cv += v;
+      return {
+        i,
+        v
+      };
+    });
+    grandQty += cq;
+    grandVal += cv;
+    return /*#__PURE__*/React.createElement("div", {
+      className: "hk-card",
+      key: cat
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "hk-rowhead"
+    }, /*#__PURE__*/React.createElement("b", null, cat), /*#__PURE__*/React.createElement("span", {
+      className: "muted"
+    }, num(cq), " units \xB7 ", NRS(cv))), /*#__PURE__*/React.createElement("table", {
+      className: "hk-table"
+    }, /*#__PURE__*/React.createElement("thead", null, /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("th", null, "Item"), /*#__PURE__*/React.createElement("th", {
+      className: "r"
+    }, "Qty"), /*#__PURE__*/React.createElement("th", null, "Unit"), /*#__PURE__*/React.createElement("th", {
+      className: "r"
+    }, "Cost"), /*#__PURE__*/React.createElement("th", {
+      className: "r"
+    }, "Value"))), /*#__PURE__*/React.createElement("tbody", null, rows.map(({
+      i,
+      v
+    }) => /*#__PURE__*/React.createElement("tr", {
+      key: i.id
+    }, /*#__PURE__*/React.createElement("td", null, i.name, i.qty <= 0 && /*#__PURE__*/React.createElement("span", {
+      className: "hk-tag warn"
+    }, "low")), /*#__PURE__*/React.createElement("td", {
+      className: "r" + (i.qty <= 0 ? " bad" : "")
+    }, num(i.qty)), /*#__PURE__*/React.createElement("td", null, i.unit), /*#__PURE__*/React.createElement("td", {
+      className: "r"
+    }, num(i.cost)), /*#__PURE__*/React.createElement("td", {
+      className: "r"
+    }, NRS(v)))))));
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "hk-card report"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "hk-net pos"
+  }, /*#__PURE__*/React.createElement("span", null, "Total inventory value (", num(grandQty), " units)"), /*#__PURE__*/React.createElement("b", null, NRS(grandVal)))));
 }
 /* ============================ Styles ============================ */
 function Style() {
