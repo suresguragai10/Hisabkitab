@@ -878,6 +878,7 @@ function App() {
   const [session, setSession] = useState(null);
   const [db, setDb] = useState(null);
   const [tab, setTab] = useState("dashboard");
+  const [openMenu, setOpenMenu] = useState(null);
   const [toast, setToast] = useState(null);
   const [theme, setTheme] = useState("light");
   const flash = m => {
@@ -902,6 +903,13 @@ function App() {
   useEffect(() => {
     document.documentElement.setAttribute("data-theme", theme);
   }, [theme]);
+  useEffect(() => {
+    const onDoc = e => {
+      if (!e.target.closest || !e.target.closest(".hk-nav")) setOpenMenu(null);
+    };
+    document.addEventListener("click", onDoc);
+    return () => document.removeEventListener("click", onDoc);
+  }, []);
   const toggleTheme = () => {
     const t = theme === "light" ? "dark" : "light";
     setTheme(t);
@@ -963,7 +971,33 @@ function App() {
     saveDb,
     flash
   };
-  const tabs = [["dashboard", "Dashboard"], ["vouchers", "Vouchers"], ["invoices", "Invoices"], ["bills", "Bills"], ["receive", "Receive Payment"], ["makepay", "Make Payment"], ["journalbook", "Day Book"], ["coa", "Chart of Accounts"], ["inventory", "Inventory"], ["stockledger", "Stock Ledger"], ["valuation", "Stock Valuation"], ["parties", "Debtors / Creditors"], ["ledger", "Party Ledger"], ["aging", "Aging"], ["assets", "Fixed Assets"], ["pl", "Profit & Loss"], ["bs", "Balance Sheet"], ["cf", "Cash Flow"], ["vat", "VAT Books"], ["reports", "Reports & Export"], ["backup", "Backup"], ["settings", "Settings"]];
+  const MENUS = [{
+    key: "dashboard",
+    label: "Dashboard",
+    items: []
+  }, {
+    key: "sales",
+    label: "Sales",
+    items: [["invoices", "Invoices"], ["receive", "Receive Payment"], ["parties", "Debtors / Creditors"], ["ledger", "Party Ledger"], ["aging", "Aging"]]
+  }, {
+    key: "purchases",
+    label: "Purchases",
+    items: [["bills", "Bills"], ["makepay", "Make Payment"]]
+  }, {
+    key: "inventory_m",
+    label: "Inventory",
+    items: [["inventory", "Inventory"], ["stockledger", "Stock Ledger"], ["valuation", "Stock Valuation"]]
+  }, {
+    key: "accounting",
+    label: "Accounting",
+    items: [["vouchers", "Vouchers"], ["journalbook", "Day Book"], ["assets", "Fixed Assets"], ["pl", "Profit & Loss"], ["bs", "Balance Sheet"], ["cf", "Cash Flow"], ["vat", "VAT Books"], ["reports", "Reports & Export"]]
+  }, {
+    key: "settings_m",
+    label: "Settings",
+    items: [["coa", "Chart of Accounts"], ["backup", "Backup"], ["settings", "Settings"]]
+  }];
+  // which menu owns the current tab (for highlighting the active group)
+  const activeMenu = MENUS.find(m => m.key === tab || m.items.some(([k]) => k === tab));
   return /*#__PURE__*/React.createElement("div", {
     className: "hk-root"
   }, /*#__PURE__*/React.createElement(Style, null), /*#__PURE__*/React.createElement("header", {
@@ -994,11 +1028,41 @@ function App() {
     onClick: logout
   }, "Sign out"))), /*#__PURE__*/React.createElement("nav", {
     className: "hk-nav"
-  }, tabs.map(([k, l]) => /*#__PURE__*/React.createElement("button", {
-    key: k,
-    className: "hk-navbtn" + (tab === k ? " on" : ""),
-    onClick: () => setTab(k)
-  }, l))), /*#__PURE__*/React.createElement("main", {
+  }, MENUS.map(m => {
+    const isActive = activeMenu && activeMenu.key === m.key;
+    if (m.items.length === 0) {
+      return /*#__PURE__*/React.createElement("button", {
+        key: m.key,
+        className: "hk-navbtn" + (tab === m.key ? " on" : ""),
+        onClick: () => {
+          setTab(m.key);
+          setOpenMenu(null);
+        }
+      }, m.label);
+    }
+    const isOpen = openMenu === m.key;
+    return /*#__PURE__*/React.createElement("div", {
+      key: m.key,
+      className: "hk-menu"
+    }, /*#__PURE__*/React.createElement("button", {
+      className: "hk-navbtn" + (isActive ? " on" : "") + (isOpen ? " open" : ""),
+      onClick: e => {
+        e.stopPropagation();
+        setOpenMenu(isOpen ? null : m.key);
+      }
+    }, m.label, " ", /*#__PURE__*/React.createElement("span", {
+      className: "hk-caret"
+    }, "\u25BE")), isOpen && /*#__PURE__*/React.createElement("div", {
+      className: "hk-dropdown"
+    }, m.items.map(([k, l]) => /*#__PURE__*/React.createElement("button", {
+      key: k,
+      className: "hk-dropitem" + (tab === k ? " on" : ""),
+      onClick: () => {
+        setTab(k);
+        setOpenMenu(null);
+      }
+    }, l))));
+  })), /*#__PURE__*/React.createElement("main", {
     className: "hk-main"
   }, tab === "dashboard" && /*#__PURE__*/React.createElement(Dashboard, _extends({}, ctx, {
     go: setTab
@@ -4751,10 +4815,17 @@ function Style() {
   .hk-bsbadge{font-size:12px;background:#ffffff22;padding:5px 10px;border-radius:20px;color:#f3efe2}
   .hk-ghost{background:transparent;border:1px solid #ffffff55;color:#f3efe2;padding:7px 12px;border-radius:8px;cursor:pointer;font-size:13px}
   .hk-ghost:hover{background:#ffffff1a}
-  .hk-nav{display:flex;gap:4px;flex-wrap:wrap;padding:10px 16px;background:var(--navbg);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:5;backdrop-filter:blur(6px)}
+  .hk-nav{display:flex;gap:4px;flex-wrap:wrap;padding:10px 16px;background:var(--navbg);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:20;backdrop-filter:blur(6px)}
   .hk-navbtn{border:1px solid transparent;background:transparent;padding:8px 13px;border-radius:9px;cursor:pointer;font-size:13.5px;color:var(--ink2)}
   .hk-navbtn:hover{background:color-mix(in srgb, var(--green) 12%, transparent)}
   .hk-navbtn.on{background:var(--green);color:#fff}
+  .hk-menu{position:relative}
+  .hk-caret{font-size:9px;opacity:.7;margin-left:2px}
+  .hk-navbtn.open{background:color-mix(in srgb,var(--green) 14%,transparent)}
+  .hk-dropdown{position:absolute;top:calc(100% + 6px);left:0;min-width:210px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:6px;z-index:30;box-shadow:0 12px 34px rgba(0,0,0,.18);display:flex;flex-direction:column;gap:2px}
+  .hk-dropitem{text-align:left;border:none;background:transparent;padding:9px 12px;border-radius:8px;cursor:pointer;font-size:13.5px;color:var(--ink)}
+  .hk-dropitem:hover{background:color-mix(in srgb,var(--green) 12%,transparent)}
+  .hk-dropitem.on{background:var(--green);color:#fff}
   .hk-main{max-width:1080px;margin:0 auto;padding:22px 18px 60px}
   .hk-h{margin:4px 2px 16px}.hk-h h1{font-size:26px;margin:0}.hk-h p{margin:4px 0 0;color:var(--ink2);font-size:13.5px}
   .hk-card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px;margin-bottom:16px}
