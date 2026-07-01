@@ -730,6 +730,43 @@ const newDB = profile => ({
 });
 const acc = (db, code) => db.accounts.find(a => a.code === code);
 
+/* download helpers */
+function downloadBlob(filename, text, type) {
+  try {
+    const blob = new Blob([text], {
+      type: type || "text/plain"
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  } catch (e) {}
+}
+function csvEscape(v) {
+  const s = v == null ? "" : String(v);
+  return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+}
+function exportCSV(filename, headers, rows) {
+  const lines = [headers.map(csvEscape).join(",")];
+  rows.forEach(r => lines.push(r.map(csvEscape).join(",")));
+  downloadBlob(filename, lines.join("\n"), "text/csv;charset=utf-8");
+}
+/* list all company db keys stored locally */
+function listCompanies() {
+  const out = [];
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k && k.indexOf(PREFIX + "db:") === 0) out.push(k.slice((PREFIX + "db:").length));
+    }
+  } catch (e) {}
+  return out.sort();
+}
+
 /* fiscal-year label for an AD date, based on Nepal FY (Shrawan–Ashad) via BS year.
    FY string like "2082/83". */
 function fyOf(adStr) {
@@ -880,6 +917,24 @@ function App() {
     setDb(null);
     setTab("dashboard");
   };
+  const switchCompany = async name => {
+    if (!name || name === session.company) return;
+    let d = await sget("db:" + name);
+    if (!d) {
+      d = newDB();
+    }
+    d = migrate(d);
+    await sset("db:" + name, d);
+    await sset("session", {
+      company: name
+    });
+    setSession({
+      company: name
+    });
+    setDb(d);
+    setTab("dashboard");
+    flash("Switched to " + name);
+  };
   if (boot) return React.createElement(Splash, {
     theme
   });
@@ -908,7 +963,7 @@ function App() {
     saveDb,
     flash
   };
-  const tabs = [["dashboard", "Dashboard"], ["vouchers", "Vouchers"], ["invoices", "Invoices"], ["bills", "Bills"], ["receive", "Receive Payment"], ["makepay", "Make Payment"], ["journalbook", "Day Book"], ["coa", "Chart of Accounts"], ["inventory", "Inventory"], ["stockledger", "Stock Ledger"], ["valuation", "Stock Valuation"], ["parties", "Debtors / Creditors"], ["ledger", "Party Ledger"], ["aging", "Aging"], ["assets", "Fixed Assets"], ["pl", "Profit & Loss"], ["bs", "Balance Sheet"], ["cf", "Cash Flow"], ["vat", "VAT Books"], ["settings", "Settings"]];
+  const tabs = [["dashboard", "Dashboard"], ["vouchers", "Vouchers"], ["invoices", "Invoices"], ["bills", "Bills"], ["receive", "Receive Payment"], ["makepay", "Make Payment"], ["journalbook", "Day Book"], ["coa", "Chart of Accounts"], ["inventory", "Inventory"], ["stockledger", "Stock Ledger"], ["valuation", "Stock Valuation"], ["parties", "Debtors / Creditors"], ["ledger", "Party Ledger"], ["aging", "Aging"], ["assets", "Fixed Assets"], ["pl", "Profit & Loss"], ["bs", "Balance Sheet"], ["cf", "Cash Flow"], ["vat", "VAT Books"], ["reports", "Reports & Export"], ["backup", "Backup"], ["settings", "Settings"]];
   return /*#__PURE__*/React.createElement("div", {
     className: "hk-root"
   }, /*#__PURE__*/React.createElement(Style, null), /*#__PURE__*/React.createElement("header", {
@@ -919,7 +974,17 @@ function App() {
     className: "hk-logo"
   }, "\u0939\u093F\u0938\u093E\u092C"), /*#__PURE__*/React.createElement("b", null, "HisabKitab"), /*#__PURE__*/React.createElement("em", null, db.profile.name || session.company)), /*#__PURE__*/React.createElement("div", {
     className: "hk-topright"
-  }, /*#__PURE__*/React.createElement("span", {
+  }, (() => {
+    const cos = listCompanies();
+    return cos.length > 1 ? /*#__PURE__*/React.createElement("select", {
+      className: "hk-coswitch",
+      value: session.company,
+      onChange: e => switchCompany(e.target.value)
+    }, cos.map(c => /*#__PURE__*/React.createElement("option", {
+      key: c,
+      value: c
+    }, c))) : null;
+  })(), /*#__PURE__*/React.createElement("span", {
     className: "hk-bsbadge"
   }, bsLabel(today())), /*#__PURE__*/React.createElement("button", {
     className: "hk-ghost",
@@ -937,7 +1002,9 @@ function App() {
     className: "hk-main"
   }, tab === "dashboard" && /*#__PURE__*/React.createElement(Dashboard, _extends({}, ctx, {
     go: setTab
-  })), tab === "vouchers" && /*#__PURE__*/React.createElement(Vouchers, ctx), tab === "invoices" && /*#__PURE__*/React.createElement(Invoices, ctx), tab === "receive" && /*#__PURE__*/React.createElement(ReceivePayment, ctx), tab === "bills" && /*#__PURE__*/React.createElement(Bills, ctx), tab === "makepay" && /*#__PURE__*/React.createElement(MakePayment, ctx), tab === "stockledger" && /*#__PURE__*/React.createElement(StockLedger, ctx), tab === "valuation" && /*#__PURE__*/React.createElement(StockValuation, ctx), tab === "settings" && /*#__PURE__*/React.createElement(Settings, ctx), tab === "ledger" && /*#__PURE__*/React.createElement(PartyLedger, ctx), tab === "aging" && /*#__PURE__*/React.createElement(Aging, ctx), tab === "journalbook" && /*#__PURE__*/React.createElement(DayBook, ctx), tab === "coa" && /*#__PURE__*/React.createElement(COA, ctx), tab === "inventory" && /*#__PURE__*/React.createElement(Inventory, ctx), tab === "parties" && /*#__PURE__*/React.createElement(Parties, ctx), tab === "assets" && /*#__PURE__*/React.createElement(Assets, ctx), tab === "pl" && /*#__PURE__*/React.createElement(ProfitLoss, ctx), tab === "bs" && /*#__PURE__*/React.createElement(BalanceSheet, ctx), tab === "cf" && /*#__PURE__*/React.createElement(CashFlow, ctx), tab === "vat" && /*#__PURE__*/React.createElement(VatBooks, ctx)), toast && /*#__PURE__*/React.createElement("div", {
+  })), tab === "vouchers" && /*#__PURE__*/React.createElement(Vouchers, ctx), tab === "invoices" && /*#__PURE__*/React.createElement(Invoices, ctx), tab === "receive" && /*#__PURE__*/React.createElement(ReceivePayment, ctx), tab === "bills" && /*#__PURE__*/React.createElement(Bills, ctx), tab === "makepay" && /*#__PURE__*/React.createElement(MakePayment, ctx), tab === "stockledger" && /*#__PURE__*/React.createElement(StockLedger, ctx), tab === "valuation" && /*#__PURE__*/React.createElement(StockValuation, ctx), tab === "settings" && /*#__PURE__*/React.createElement(Settings, ctx), tab === "reports" && /*#__PURE__*/React.createElement(ReportsHub, ctx), tab === "backup" && /*#__PURE__*/React.createElement(Backup, _extends({}, ctx, {
+    company: session.company
+  })), tab === "ledger" && /*#__PURE__*/React.createElement(PartyLedger, ctx), tab === "aging" && /*#__PURE__*/React.createElement(Aging, ctx), tab === "journalbook" && /*#__PURE__*/React.createElement(DayBook, ctx), tab === "coa" && /*#__PURE__*/React.createElement(COA, ctx), tab === "inventory" && /*#__PURE__*/React.createElement(Inventory, ctx), tab === "parties" && /*#__PURE__*/React.createElement(Parties, ctx), tab === "assets" && /*#__PURE__*/React.createElement(Assets, ctx), tab === "pl" && /*#__PURE__*/React.createElement(ProfitLoss, ctx), tab === "bs" && /*#__PURE__*/React.createElement(BalanceSheet, ctx), tab === "cf" && /*#__PURE__*/React.createElement(CashFlow, ctx), tab === "vat" && /*#__PURE__*/React.createElement(VatBooks, ctx)), toast && /*#__PURE__*/React.createElement("div", {
     className: "hk-toast"
   }, toast));
 }
@@ -2401,6 +2468,49 @@ function Dashboard({
   const vatNet = (L.bal[acc(db, "2100").id] || 0) - (L.bal[acc(db, "1300").id] || 0);
   const stock = db.items.reduce((s, i) => s + (Number(i.qty) || 0) * (Number(i.cost) || 0), 0);
   const cards = [["Cash & Bank", cash, "cash"], ["Receivable", ar, "ar"], ["Payable", ap, "ap"], ["Net Profit", ni, ni >= 0 ? "pos" : "neg"], ["VAT Payable (net)", vatNet, "vat"], ["Stock Value", stock, "stock"]];
+
+  // 6-month sales & purchase trend (by AD month)
+  const trend = useMemo(() => {
+    const months = [];
+    const now = new Date();
+    for (let k = 5; k >= 0; k--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - k, 1);
+      months.push({
+        key: d.toISOString().slice(0, 7),
+        label: d.toLocaleString("en", {
+          month: "short"
+        }),
+        sales: 0,
+        purch: 0
+      });
+    }
+    const idx = {};
+    months.forEach((m, i) => idx[m.key] = i);
+    db.journal.forEach(e => {
+      const mk = (e.date || "").slice(0, 7);
+      if (!(mk in idx)) return;
+      const amt = e.meta ? e.meta.base : 0;
+      if (e.ref === "INV") months[idx[mk]].sales += amt;else if (e.ref === "BILL") months[idx[mk]].purch += amt;
+    });
+    const max = Math.max(1, ...months.map(m => Math.max(m.sales, m.purch)));
+    return {
+      months,
+      max
+    };
+  }, [db]);
+
+  // top customers by receivable/sales
+  const topCust = useMemo(() => {
+    const arId = acc(db, "1100").id;
+    const map = {};
+    db.journal.filter(e => e.ref === "INV").forEach(e => {
+      const p = db.parties.find(x => x.id === e.partyId);
+      const name = p ? p.name : "Cash sale";
+      map[name] = (map[name] || 0) + (e.meta ? e.meta.base : 0);
+    });
+    return Object.entries(map).sort((a, b) => b[1] - a[1]).slice(0, 5);
+  }, [db]);
+  const lowStock = db.items.filter(i => (Number(i.qty) || 0) <= 0);
   return /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement(H, {
     title: "Dashboard",
     sub: "Live position • Today is " + bsLabel(today())
@@ -2410,6 +2520,63 @@ function Dashboard({
     key: l,
     className: "hk-card kpi " + c
   }, /*#__PURE__*/React.createElement("span", null, l), /*#__PURE__*/React.createElement("b", null, NRS(v))))), /*#__PURE__*/React.createElement("div", {
+    className: "hk-dashgrid"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "hk-card"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "hk-rowhead"
+  }, /*#__PURE__*/React.createElement("b", null, "Sales vs Purchase \u2014 last 6 months")), /*#__PURE__*/React.createElement("div", {
+    className: "hk-bars"
+  }, trend.months.map(m => /*#__PURE__*/React.createElement("div", {
+    className: "hk-barcol",
+    key: m.key
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "hk-barpair"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "hk-bar sales",
+    style: {
+      height: m.sales / trend.max * 90 + 2 + "px"
+    },
+    title: "Sales " + num(m.sales)
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "hk-bar purch",
+    style: {
+      height: m.purch / trend.max * 90 + 2 + "px"
+    },
+    title: "Purchase " + num(m.purch)
+  })), /*#__PURE__*/React.createElement("span", {
+    className: "hk-barlbl"
+  }, m.label)))), /*#__PURE__*/React.createElement("div", {
+    className: "hk-legend"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "dot sales"
+  }), "Sales ", /*#__PURE__*/React.createElement("span", {
+    className: "dot purch"
+  }), "Purchase")), /*#__PURE__*/React.createElement("div", {
+    className: "hk-card"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "hk-rowhead"
+  }, /*#__PURE__*/React.createElement("b", null, "Top customers")), topCust.length === 0 ? /*#__PURE__*/React.createElement(Empty, {
+    msg: "No sales yet."
+  }) : /*#__PURE__*/React.createElement("table", {
+    className: "hk-table"
+  }, /*#__PURE__*/React.createElement("tbody", null, topCust.map(([n, v]) => /*#__PURE__*/React.createElement("tr", {
+    key: n
+  }, /*#__PURE__*/React.createElement("td", null, n), /*#__PURE__*/React.createElement("td", {
+    className: "r"
+  }, NRS(v)))))))), lowStock.length > 0 && /*#__PURE__*/React.createElement("div", {
+    className: "hk-card hk-alert"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "hk-rowhead"
+  }, /*#__PURE__*/React.createElement("b", null, "\u26A0 Low / out of stock (", lowStock.length, ")"), /*#__PURE__*/React.createElement("button", {
+    className: "hk-link",
+    onClick: () => go("inventory")
+  }, "manage")), /*#__PURE__*/React.createElement("div", {
+    className: "hk-chips"
+  }, lowStock.map(i => /*#__PURE__*/React.createElement("span", {
+    key: i.id,
+    className: "hk-chip"
+  }, i.name, ": ", num(i.qty))))), /*#__PURE__*/React.createElement("div", {
     className: "hk-card"
   }, /*#__PURE__*/React.createElement("div", {
     className: "hk-rowhead"
@@ -2420,14 +2587,14 @@ function Dashboard({
     onClick: () => go("vouchers")
   }, "New Voucher"), /*#__PURE__*/React.createElement("button", {
     className: "hk-btn alt",
-    onClick: () => go("vat")
-  }, "VAT Books"), /*#__PURE__*/React.createElement("button", {
+    onClick: () => go("reports")
+  }, "Reports & Export"), /*#__PURE__*/React.createElement("button", {
     className: "hk-btn alt",
     onClick: () => go("bs")
   }, "Balance Sheet"), /*#__PURE__*/React.createElement("button", {
     className: "hk-btn alt",
-    onClick: () => go("inventory")
-  }, "Inventory"))), /*#__PURE__*/React.createElement(TrialBalance, {
+    onClick: () => go("vat")
+  }, "VAT Books"))), /*#__PURE__*/React.createElement(TrialBalance, {
     db: db,
     L: L
   }));
@@ -4357,6 +4524,208 @@ function StockValuation({
     className: "hk-net pos"
   }, /*#__PURE__*/React.createElement("span", null, "Total inventory value (", num(grandQty), " units)"), /*#__PURE__*/React.createElement("b", null, NRS(grandVal)))));
 }
+/* ============================ Reports & Export hub ============================ */
+function ReportsHub({
+  db,
+  flash
+}) {
+  const L = useMemo(() => computeLedger(db), [db]);
+  const stamp = today();
+  const expTrial = () => {
+    const rows = [];
+    db.accounts.forEach(a => {
+      const b = L.bal[a.id] || 0;
+      if (Math.abs(b) < 0.005) return;
+      const dr = TYPE_META[a.type].normal === "debit" ? b : -b;
+      rows.push([a.code, a.name, dr > 0 ? dr.toFixed(2) : "", dr < 0 ? (-dr).toFixed(2) : ""]);
+    });
+    exportCSV("trial-balance-" + stamp + ".csv", ["Code", "Account", "Debit", "Credit"], rows);
+    flash("Trial Balance exported.");
+  };
+  const expPL = () => {
+    const rows = [];
+    ["income", "expense"].forEach(t => {
+      rows.push([TYPE_META[t].label.toUpperCase(), ""]);
+      db.accounts.filter(a => a.type === t).forEach(a => {
+        const b = L.bal[a.id] || 0;
+        if (Math.abs(b) > 0.005) rows.push([a.code + " " + a.name, b.toFixed(2)]);
+      });
+    });
+    rows.push(["NET PROFIT", (L.sum("income") - L.sum("expense")).toFixed(2)]);
+    exportCSV("profit-loss-" + stamp + ".csv", ["Account", "Amount"], rows);
+    flash("Profit & Loss exported.");
+  };
+  const expBS = () => {
+    const rows = [];
+    const ni = netIncome(L, db);
+    const sec = t => {
+      rows.push([TYPE_META[t].label.toUpperCase(), ""]);
+      db.accounts.filter(a => a.type === t).forEach(a => {
+        const b = (a.contra ? -1 : 1) * (L.bal[a.id] || 0);
+        if (Math.abs(b) > 0.005) rows.push([a.code + " " + a.name, b.toFixed(2)]);
+      });
+    };
+    sec("asset");
+    sec("liability");
+    sec("equity");
+    rows.push(["Current Period Earnings", ni.toFixed(2)]);
+    exportCSV("balance-sheet-" + stamp + ".csv", ["Account", "Amount"], rows);
+    flash("Balance Sheet exported.");
+  };
+  const expVatSales = () => {
+    const outId = acc(db, "2100").id,
+      salesId = acc(db, "4010").id;
+    const rows = db.journal.filter(e => e.ref === "INV" || e.ref === "CN").map(e => {
+      const isCN = e.ref === "CN",
+        sign = isCN ? -1 : 1;
+      const taxable = sign * e.lines.filter(l => l.accId === salesId).reduce((s, l) => s + (Number(isCN ? l.debit : l.credit) || 0), 0);
+      const vat = sign * e.lines.filter(l => l.accId === outId).reduce((s, l) => s + (Number(isCN ? l.debit : l.credit) || 0), 0);
+      return [e.date, bsLabel(e.date), e.invNo || "", e.memo, taxable.toFixed(2), vat.toFixed(2)];
+    });
+    exportCSV("vat-sales-book-" + stamp + ".csv", ["Date AD", "Date BS", "Invoice", "Particulars", "Taxable", "VAT"], rows);
+    flash("VAT Sales Book exported.");
+  };
+  const expVatPurch = () => {
+    const inId = acc(db, "1300").id,
+      invId = acc(db, "1200").id;
+    const rows = db.journal.filter(e => e.ref === "BILL" || e.ref === "DN").map(e => {
+      const isDN = e.ref === "DN",
+        sign = isDN ? -1 : 1;
+      const taxable = sign * e.lines.filter(l => l.accId === invId).reduce((s, l) => s + (Number(isDN ? l.credit : l.debit) || 0), 0);
+      const vat = sign * e.lines.filter(l => l.accId === inId).reduce((s, l) => s + (Number(isDN ? l.credit : l.debit) || 0), 0);
+      return [e.date, bsLabel(e.date), e.memo, taxable.toFixed(2), vat.toFixed(2)];
+    });
+    exportCSV("vat-purchase-book-" + stamp + ".csv", ["Date AD", "Date BS", "Particulars", "Taxable", "VAT"], rows);
+    flash("VAT Purchase Book exported.");
+  };
+  const expDaybook = () => {
+    const byId = {};
+    db.accounts.forEach(a => byId[a.id] = a);
+    const rows = [];
+    [...db.journal].sort((a, b) => a.date.localeCompare(b.date)).forEach(e => {
+      e.lines.forEach(l => rows.push([e.date, bsLabel(e.date), e.ref, e.memo, byId[l.accId] ? byId[l.accId].code + " " + byId[l.accId].name : "", (Number(l.debit) || 0).toFixed(2), (Number(l.credit) || 0).toFixed(2)]));
+    });
+    exportCSV("day-book-" + stamp + ".csv", ["Date AD", "Date BS", "Ref", "Memo", "Account", "Debit", "Credit"], rows);
+    flash("Day Book exported.");
+  };
+  const expInventory = () => {
+    const rows = db.items.map(i => [i.name, i.category || "Uncategorised", num(i.qty), i.unit, (Number(i.cost) || 0).toFixed(2), (Number(i.price) || 0).toFixed(2), ((Number(i.qty) || 0) * (Number(i.cost) || 0)).toFixed(2)]);
+    exportCSV("inventory-" + stamp + ".csv", ["Item", "Category", "Qty", "Unit", "Cost", "Price", "Value"], rows);
+    flash("Inventory exported.");
+  };
+  const expAging = kind => {
+    const ctrlId = acc(db, kind === "customer" ? "1100" : "2010").id;
+    const nowMs = Date.parse(today());
+    const map = {};
+    db.parties.filter(p => p.kind === kind).forEach(p => map[p.id] = {
+      name: p.name,
+      b0: 0,
+      b30: 0,
+      b60: 0,
+      b90: 0
+    });
+    db.journal.filter(e => e.partyId && map[e.partyId]).forEach(e => {
+      const line = e.lines.find(l => l.accId === ctrlId);
+      if (!line) return;
+      const dr = Number(line.debit) || 0,
+        cr = Number(line.credit) || 0;
+      const amt = kind === "customer" ? dr - cr : cr - dr;
+      const days = Math.floor((nowMs - Date.parse(e.date)) / 86400000);
+      const m = map[e.partyId];
+      if (days <= 30) m.b0 += amt;else if (days <= 60) m.b30 += amt;else if (days <= 90) m.b60 += amt;else m.b90 += amt;
+    });
+    const rows = Object.values(map).filter(m => Math.abs(m.b0 + m.b30 + m.b60 + m.b90) > 0.005).map(m => [m.name, m.b0.toFixed(2), m.b30.toFixed(2), m.b60.toFixed(2), m.b90.toFixed(2), (m.b0 + m.b30 + m.b60 + m.b90).toFixed(2)]);
+    exportCSV((kind === "customer" ? "receivable" : "payable") + "-aging-" + stamp + ".csv", [kind === "customer" ? "Customer" : "Supplier", "0-30", "31-60", "61-90", "90+", "Total"], rows);
+    flash("Aging exported.");
+  };
+  const items = [["Trial Balance", expTrial], ["Profit & Loss", expPL], ["Balance Sheet", expBS], ["VAT Sales Book", expVatSales], ["VAT Purchase Book", expVatPurch], ["Day Book", expDaybook], ["Inventory", expInventory], ["Receivable Aging", () => expAging("customer")], ["Payable Aging", () => expAging("supplier")]];
+  return /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement(H, {
+    title: "Reports & Export",
+    sub: "Download any report as CSV (opens in Excel). Use the print button on invoices/bills for PDF."
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "hk-card"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "hk-rowhead"
+  }, /*#__PURE__*/React.createElement("b", null, "Export to Excel (CSV)")), /*#__PURE__*/React.createElement("div", {
+    className: "hk-exportgrid"
+  }, items.map(([label, fn]) => /*#__PURE__*/React.createElement("button", {
+    key: label,
+    className: "hk-exportbtn",
+    onClick: fn
+  }, "\u2B07 ", label))), /*#__PURE__*/React.createElement("p", {
+    className: "muted",
+    style: {
+      marginTop: 12
+    }
+  }, "CSV files open directly in Excel, Google Sheets, or LibreOffice. Numbers are unformatted for easy calculation.")));
+}
+
+/* ============================ Backup / Restore ============================ */
+function Backup({
+  db,
+  saveDb,
+  flash,
+  company
+}) {
+  const backup = () => {
+    const payload = {
+      app: "HisabKitab",
+      version: 5,
+      company,
+      exportedAt: new Date().toISOString(),
+      db
+    };
+    downloadBlob("hisabkitab-backup-" + company + "-" + today() + ".json", JSON.stringify(payload, null, 2), "application/json");
+    flash("Backup downloaded.");
+  };
+  const restore = e => {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+    const r = new FileReader();
+    r.onload = () => {
+      try {
+        const parsed = JSON.parse(r.result);
+        const incoming = parsed && parsed.db ? parsed.db : parsed;
+        if (!incoming || !Array.isArray(incoming.accounts)) return flash("Not a valid HisabKitab backup.");
+        if (!window.confirm("This will REPLACE all current data for this company with the backup. Continue?")) return;
+        saveDb(migrate(incoming));
+        flash("Backup restored.");
+      } catch (err) {
+        flash("Could not read that file.");
+      }
+    };
+    r.readAsText(file);
+  };
+  return /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement(H, {
+    title: "Backup & Restore",
+    sub: "Your books live in this browser. Download regular backups to stay safe."
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "hk-card"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "hk-rowhead"
+  }, /*#__PURE__*/React.createElement("b", null, "Download backup")), /*#__PURE__*/React.createElement("p", {
+    className: "muted"
+  }, "Saves everything \u2014 accounts, vouchers, invoices, inventory, parties, assets \u2014 as a single JSON file."), /*#__PURE__*/React.createElement("button", {
+    className: "hk-btn",
+    onClick: backup
+  }, "\u2B07 Download backup (.json)")), /*#__PURE__*/React.createElement("div", {
+    className: "hk-card"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "hk-rowhead"
+  }, /*#__PURE__*/React.createElement("b", null, "Restore from backup")), /*#__PURE__*/React.createElement("p", {
+    className: "muted"
+  }, "Choose a backup file to restore. This replaces the current company's data."), /*#__PURE__*/React.createElement("input", {
+    type: "file",
+    accept: "application/json,.json",
+    onChange: restore
+  })), /*#__PURE__*/React.createElement("div", {
+    className: "hk-card hk-alert"
+  }, /*#__PURE__*/React.createElement("p", {
+    style: {
+      margin: 0
+    }
+  }, /*#__PURE__*/React.createElement("b", null, "Why this matters:"), " data is stored in your browser (localStorage). Clearing browser data, switching devices, or using private mode will lose it. Download a backup regularly, and keep it somewhere safe.")));
+}
 /* ============================ Styles ============================ */
 function Style() {
   return /*#__PURE__*/React.createElement("style", null, `
@@ -4504,6 +4873,26 @@ function Style() {
   .hk-btn.small{padding:6px 12px;font-size:12.5px}
   .hk-logorow{display:flex;gap:16px;align-items:center}
   .hk-logoprev{max-height:72px;max-width:140px;border:1px solid var(--line);border-radius:8px;background:#fff;padding:4px}
+  .hk-coswitch{max-width:160px;padding:6px 10px;font-size:13px;background:#ffffff22;color:#f3efe2;border:1px solid #ffffff44}
+  .hk-coswitch option{color:#111}
+  .hk-dashgrid{display:grid;grid-template-columns:1.4fr 1fr;gap:16px}
+  .hk-bars{display:flex;justify-content:space-around;align-items:flex-end;height:120px;padding:8px 0;gap:6px}
+  .hk-barcol{display:flex;flex-direction:column;align-items:center;gap:6px;flex:1}
+  .hk-barpair{display:flex;gap:3px;align-items:flex-end;height:100px}
+  .hk-bar{width:14px;border-radius:3px 3px 0 0}
+  .hk-bar.sales{background:var(--green)}
+  .hk-bar.purch{background:var(--gold)}
+  .hk-barlbl{font-size:11px;color:var(--ink2)}
+  .hk-legend{display:flex;gap:14px;justify-content:center;font-size:12px;color:var(--ink2);margin-top:6px}
+  .hk-legend .dot{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:4px;vertical-align:middle}
+  .hk-legend .dot.sales{background:var(--green)}.hk-legend .dot.purch{background:var(--gold)}
+  .hk-alert{border-color:color-mix(in srgb,var(--gold) 40%,var(--line))}
+  .hk-chips{display:flex;flex-wrap:wrap;gap:6px}
+  .hk-chip{font-size:12px;background:color-mix(in srgb,var(--rust) 12%,transparent);color:var(--rust);padding:4px 10px;border-radius:20px}
+  .hk-exportgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px}
+  .hk-exportbtn{padding:14px;border:1px solid var(--line);background:var(--card);border-radius:10px;cursor:pointer;font-size:13.5px;color:var(--ink);text-align:left}
+  .hk-exportbtn:hover{border-color:var(--green);background:color-mix(in srgb,var(--green) 6%,transparent)}
+  @media(max-width:760px){.hk-dashgrid{grid-template-columns:1fr}}
   `);
 }
 ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
