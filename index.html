@@ -726,6 +726,7 @@ const newDB = profile => ({
   items: [],
   parties: [],
   assets: [],
+  categories: [],
   setupDone: false
 });
 const acc = (db, code) => db.accounts.find(a => a.code === code);
@@ -801,6 +802,7 @@ function migrate(db) {
     })) : [],
     parties: Array.isArray(db.parties) ? db.parties : [],
     assets: Array.isArray(db.assets) ? db.assets : [],
+    categories: Array.isArray(db.categories) ? db.categories : [],
     setupDone: db.setupDone === true
   };
   // ensure all system accounts exist (old dbs may miss new ones like Loans/TDS)
@@ -810,22 +812,41 @@ function migrate(db) {
       ...s
     });
   });
+  // auto-populate managed categories from any category already used by items
+  const known = new Set(out.categories.map(c => c.name));
+  out.items.forEach(i => {
+    const c = i.category;
+    if (c && c !== "Uncategorised" && !known.has(c)) {
+      out.categories.push({
+        id: uid(),
+        name: c
+      });
+      known.add(c);
+    }
+  });
   return out;
 }
 
-/* ---------- ledger math ---------- */
-function computeLedger(db) {
+/* ---------- ledger math ----------
+   opts: {from, to} optional AD date strings (inclusive). Omit for all-time. */
+function computeLedger(db, opts) {
+  const from = opts && opts.from ? opts.from : null;
+  const to = opts && opts.to ? opts.to : null;
+  const inRange = d => (!from || d >= from) && (!to || d <= to);
   const byId = {};
   db.accounts.forEach(a => byId[a.id] = a);
   const bal = {};
   db.accounts.forEach(a => bal[a.id] = 0);
-  db.journal.forEach(e => e.lines.forEach(l => {
-    const a = byId[l.accId];
-    if (!a) return;
-    const d = Number(l.debit) || 0,
-      c = Number(l.credit) || 0;
-    bal[l.accId] += TYPE_META[a.type].normal === "debit" ? d - c : c - d;
-  }));
+  db.journal.forEach(e => {
+    if (!inRange(e.date || "")) return;
+    e.lines.forEach(l => {
+      const a = byId[l.accId];
+      if (!a) return;
+      const d = Number(l.debit) || 0,
+        c = Number(l.credit) || 0;
+      bal[l.accId] += TYPE_META[a.type].normal === "debit" ? d - c : c - d;
+    });
+  });
   const sum = (type, grp) => db.accounts.filter(a => a.type === type && (!grp || a.group === grp)).reduce((s, a) => s + (a.contra ? -1 : 1) * (bal[a.id] || 0), 0);
   return {
     byId,
@@ -986,11 +1007,15 @@ function App() {
   }, {
     key: "inventory_m",
     label: "Inventory",
-    items: [["inventory", "Inventory"], ["stockledger", "Stock Ledger"], ["valuation", "Stock Valuation"]]
+    items: [["inventory", "Inventory"], ["categories", "Categories"], ["stockledger", "Stock Ledger"], ["valuation", "Stock Valuation"]]
   }, {
     key: "accounting",
     label: "Accounting",
-    items: [["vouchers", "Vouchers"], ["journalbook", "Day Book"], ["assets", "Fixed Assets"], ["pl", "Profit & Loss"], ["bs", "Balance Sheet"], ["cf", "Cash Flow"], ["vat", "VAT Books"], ["reports", "Reports & Export"]]
+    items: [["vouchers", "Vouchers"], ["assets", "Fixed Assets"], ["vat", "VAT Books"]]
+  }, {
+    key: "reports_m",
+    label: "Reports",
+    items: [["r_trial", "Trial Balance"], ["r_pl", "Profit & Loss"], ["r_bs", "Balance Sheet"], ["r_cf", "Cash Flow"], ["r_day", "Day Book"]]
   }, {
     key: "settings_m",
     label: "Settings",
@@ -1066,9 +1091,9 @@ function App() {
     className: "hk-main"
   }, tab === "dashboard" && /*#__PURE__*/React.createElement(Dashboard, _extends({}, ctx, {
     go: setTab
-  })), tab === "vouchers" && /*#__PURE__*/React.createElement(Vouchers, ctx), tab === "invoices" && /*#__PURE__*/React.createElement(Invoices, ctx), tab === "receive" && /*#__PURE__*/React.createElement(ReceivePayment, ctx), tab === "bills" && /*#__PURE__*/React.createElement(Bills, ctx), tab === "makepay" && /*#__PURE__*/React.createElement(MakePayment, ctx), tab === "stockledger" && /*#__PURE__*/React.createElement(StockLedger, ctx), tab === "valuation" && /*#__PURE__*/React.createElement(StockValuation, ctx), tab === "settings" && /*#__PURE__*/React.createElement(Settings, ctx), tab === "reports" && /*#__PURE__*/React.createElement(ReportsHub, ctx), tab === "backup" && /*#__PURE__*/React.createElement(Backup, _extends({}, ctx, {
+  })), tab === "vouchers" && /*#__PURE__*/React.createElement(Vouchers, ctx), tab === "invoices" && /*#__PURE__*/React.createElement(Invoices, ctx), tab === "receive" && /*#__PURE__*/React.createElement(ReceivePayment, ctx), tab === "bills" && /*#__PURE__*/React.createElement(Bills, ctx), tab === "makepay" && /*#__PURE__*/React.createElement(MakePayment, ctx), tab === "stockledger" && /*#__PURE__*/React.createElement(StockLedger, ctx), tab === "valuation" && /*#__PURE__*/React.createElement(StockValuation, ctx), tab === "settings" && /*#__PURE__*/React.createElement(Settings, ctx), tab === "r_trial" && /*#__PURE__*/React.createElement(RTrialBalance, ctx), tab === "r_pl" && /*#__PURE__*/React.createElement(RProfitLoss, ctx), tab === "r_bs" && /*#__PURE__*/React.createElement(RBalanceSheet, ctx), tab === "r_cf" && /*#__PURE__*/React.createElement(RCashFlow, ctx), tab === "r_day" && /*#__PURE__*/React.createElement(RDayBook, ctx), tab === "backup" && /*#__PURE__*/React.createElement(Backup, _extends({}, ctx, {
     company: session.company
-  })), tab === "ledger" && /*#__PURE__*/React.createElement(PartyLedger, ctx), tab === "aging" && /*#__PURE__*/React.createElement(Aging, ctx), tab === "journalbook" && /*#__PURE__*/React.createElement(DayBook, ctx), tab === "coa" && /*#__PURE__*/React.createElement(COA, ctx), tab === "inventory" && /*#__PURE__*/React.createElement(Inventory, ctx), tab === "parties" && /*#__PURE__*/React.createElement(Parties, ctx), tab === "assets" && /*#__PURE__*/React.createElement(Assets, ctx), tab === "pl" && /*#__PURE__*/React.createElement(ProfitLoss, ctx), tab === "bs" && /*#__PURE__*/React.createElement(BalanceSheet, ctx), tab === "cf" && /*#__PURE__*/React.createElement(CashFlow, ctx), tab === "vat" && /*#__PURE__*/React.createElement(VatBooks, ctx)), toast && /*#__PURE__*/React.createElement("div", {
+  })), tab === "ledger" && /*#__PURE__*/React.createElement(PartyLedger, ctx), tab === "aging" && /*#__PURE__*/React.createElement(Aging, ctx), tab === "journalbook" && /*#__PURE__*/React.createElement(DayBook, ctx), tab === "coa" && /*#__PURE__*/React.createElement(COA, ctx), tab === "inventory" && /*#__PURE__*/React.createElement(Inventory, ctx), tab === "categories" && /*#__PURE__*/React.createElement(Categories, ctx), tab === "parties" && /*#__PURE__*/React.createElement(Parties, ctx), tab === "assets" && /*#__PURE__*/React.createElement(Assets, ctx), tab === "pl" && /*#__PURE__*/React.createElement(ProfitLoss, ctx), tab === "bs" && /*#__PURE__*/React.createElement(BalanceSheet, ctx), tab === "cf" && /*#__PURE__*/React.createElement(CashFlow, ctx), tab === "vat" && /*#__PURE__*/React.createElement(VatBooks, ctx)), toast && /*#__PURE__*/React.createElement("div", {
     className: "hk-toast"
   }, toast));
 }
@@ -2651,10 +2676,10 @@ function Dashboard({
     onClick: () => go("vouchers")
   }, "New Voucher"), /*#__PURE__*/React.createElement("button", {
     className: "hk-btn alt",
-    onClick: () => go("reports")
-  }, "Reports & Export"), /*#__PURE__*/React.createElement("button", {
+    onClick: () => go("r_pl")
+  }, "Profit & Loss"), /*#__PURE__*/React.createElement("button", {
     className: "hk-btn alt",
-    onClick: () => go("bs")
+    onClick: () => go("r_bs")
   }, "Balance Sheet"), /*#__PURE__*/React.createElement("button", {
     className: "hk-btn alt",
     onClick: () => go("vat")
@@ -2851,7 +2876,14 @@ function Inventory({
     ...db,
     items: db.items.filter(x => x.id !== id)
   });
-  const cats = [...new Set(db.items.map(i => i.category || "Uncategorised"))];
+  const setItemCat = (id, cat) => saveDb({
+    ...db,
+    items: db.items.map(i => i.id === id ? {
+      ...i,
+      category: cat
+    } : i)
+  });
+  const cats = db.categories || [];
   return /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement(H, {
     title: "Inventory",
     sub: "Stock updates automatically from sales, purchases and returns."
@@ -2866,20 +2898,18 @@ function Inventory({
       ...f,
       name: e.target.value
     })
-  }), /*#__PURE__*/React.createElement("input", {
-    placeholder: "Category",
-    list: "hk-cats",
+  }), /*#__PURE__*/React.createElement("select", {
     value: f.category,
     onChange: e => setF({
       ...f,
       category: e.target.value
     })
-  }), /*#__PURE__*/React.createElement("datalist", {
-    id: "hk-cats"
-  }, cats.map(c => /*#__PURE__*/React.createElement("option", {
-    key: c,
-    value: c
-  }))), /*#__PURE__*/React.createElement("input", {
+  }, /*#__PURE__*/React.createElement("option", {
+    value: ""
+  }, "Uncategorised"), cats.map(c => /*#__PURE__*/React.createElement("option", {
+    key: c.id,
+    value: c.name
+  }, c.name))), /*#__PURE__*/React.createElement("input", {
     placeholder: "Unit",
     value: f.unit,
     onChange: e => setF({
@@ -2905,7 +2935,12 @@ function Inventory({
   }), /*#__PURE__*/React.createElement("button", {
     className: "hk-btn",
     onClick: add
-  }, "Add item"))), /*#__PURE__*/React.createElement("div", {
+  }, "Add item")), cats.length === 0 && /*#__PURE__*/React.createElement("p", {
+    className: "muted",
+    style: {
+      marginTop: 8
+    }
+  }, "Tip: add categories under Inventory \u2192 Categories to organise your items.")), /*#__PURE__*/React.createElement("div", {
     className: "hk-card"
   }, db.items.length === 0 ? /*#__PURE__*/React.createElement(Empty, {
     msg: "No items yet."
@@ -2923,9 +2958,16 @@ function Inventory({
     key: i.id
   }, /*#__PURE__*/React.createElement("td", null, i.name, i.qty <= 0 && /*#__PURE__*/React.createElement("span", {
     className: "hk-tag warn"
-  }, "low")), /*#__PURE__*/React.createElement("td", {
-    className: "muted"
-  }, i.category || "Uncategorised"), /*#__PURE__*/React.createElement("td", {
+  }, "low")), /*#__PURE__*/React.createElement("td", null, /*#__PURE__*/React.createElement("select", {
+    className: "hk-catsel",
+    value: cats.some(c => c.name === i.category) ? i.category : "",
+    onChange: e => setItemCat(i.id, e.target.value || "Uncategorised")
+  }, /*#__PURE__*/React.createElement("option", {
+    value: ""
+  }, "Uncategorised"), cats.map(c => /*#__PURE__*/React.createElement("option", {
+    key: c.id,
+    value: c.name
+  }, c.name)))), /*#__PURE__*/React.createElement("td", {
     className: "r" + (i.qty <= 0 ? " bad" : "")
   }, num(i.qty)), /*#__PURE__*/React.createElement("td", null, i.unit), /*#__PURE__*/React.createElement("td", {
     className: "r"
@@ -4588,6 +4630,126 @@ function StockValuation({
     className: "hk-net pos"
   }, /*#__PURE__*/React.createElement("span", null, "Total inventory value (", num(grandQty), " units)"), /*#__PURE__*/React.createElement("b", null, NRS(grandVal)))));
 }
+
+/* ============================ Category management ============================ */
+function Categories({
+  db,
+  saveDb,
+  flash
+}) {
+  const [name, setName] = useState("");
+  const [editId, setEditId] = useState(null);
+  const [editName, setEditName] = useState("");
+  const cats = db.categories || [];
+  const countFor = cn => db.items.filter(i => (i.category || "Uncategorised") === cn).length;
+  const add = () => {
+    const n = name.trim();
+    if (!n) return flash("Enter a category name.");
+    if (n.toLowerCase() === "uncategorised") return flash("That name is reserved.");
+    if (cats.some(c => c.name.toLowerCase() === n.toLowerCase())) return flash("Category already exists.");
+    saveDb({
+      ...db,
+      categories: [...cats, {
+        id: uid(),
+        name: n
+      }]
+    });
+    setName("");
+    flash("Category added.");
+  };
+  const startEdit = c => {
+    setEditId(c.id);
+    setEditName(c.name);
+  };
+  const saveEdit = c => {
+    const n = editName.trim();
+    if (!n) return flash("Name required.");
+    if (cats.some(x => x.id !== c.id && x.name.toLowerCase() === n.toLowerCase())) return flash("Another category has that name.");
+    // rename category on all items that use the old name
+    const items = db.items.map(i => i.category === c.name ? {
+      ...i,
+      category: n
+    } : i);
+    const categories = cats.map(x => x.id === c.id ? {
+      ...x,
+      name: n
+    } : x);
+    saveDb({
+      ...db,
+      items,
+      categories
+    });
+    setEditId(null);
+    flash("Renamed — items updated.");
+  };
+  const del = c => {
+    const n = countFor(c.name);
+    if (n > 0 && !window.confirm(n + " item(s) will move to Uncategorised. Delete category \"" + c.name + "\"?")) return;
+    const items = db.items.map(i => i.category === c.name ? {
+      ...i,
+      category: "Uncategorised"
+    } : i);
+    saveDb({
+      ...db,
+      items,
+      categories: cats.filter(x => x.id !== c.id)
+    });
+    flash("Category deleted.");
+  };
+  const uncatCount = countFor("Uncategorised");
+  return /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement(H, {
+    title: "Categories",
+    sub: "Create and manage inventory categories. Items pick from this list."
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "hk-card"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "hk-form2"
+  }, /*#__PURE__*/React.createElement("input", {
+    placeholder: "New category name",
+    value: name,
+    onChange: e => setName(e.target.value),
+    onKeyDown: e => e.key === "Enter" && add()
+  }), /*#__PURE__*/React.createElement("button", {
+    className: "hk-btn",
+    onClick: add
+  }, "Add category"))), /*#__PURE__*/React.createElement("div", {
+    className: "hk-card"
+  }, cats.length === 0 ? /*#__PURE__*/React.createElement(Empty, {
+    msg: "No categories yet. Add one above."
+  }) : /*#__PURE__*/React.createElement("table", {
+    className: "hk-table"
+  }, /*#__PURE__*/React.createElement("thead", null, /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("th", null, "Category"), /*#__PURE__*/React.createElement("th", {
+    className: "r"
+  }, "Items"), /*#__PURE__*/React.createElement("th", null))), /*#__PURE__*/React.createElement("tbody", null, cats.map(c => /*#__PURE__*/React.createElement("tr", {
+    key: c.id
+  }, /*#__PURE__*/React.createElement("td", null, editId === c.id ? /*#__PURE__*/React.createElement("input", {
+    value: editName,
+    onChange: e => setEditName(e.target.value),
+    onKeyDown: e => e.key === "Enter" && saveEdit(c)
+  }) : c.name), /*#__PURE__*/React.createElement("td", {
+    className: "r"
+  }, countFor(c.name)), /*#__PURE__*/React.createElement("td", {
+    className: "r"
+  }, editId === c.id ? /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("button", {
+    className: "hk-link",
+    onClick: () => saveEdit(c)
+  }, "save"), " ", /*#__PURE__*/React.createElement("button", {
+    className: "hk-x",
+    onClick: () => setEditId(null)
+  }, "cancel")) : /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("button", {
+    className: "hk-link",
+    onClick: () => startEdit(c)
+  }, "rename"), " ", /*#__PURE__*/React.createElement("button", {
+    className: "hk-x",
+    onClick: () => del(c)
+  }, "delete"))))), uncatCount > 0 && /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("td", {
+    className: "muted"
+  }, "Uncategorised"), /*#__PURE__*/React.createElement("td", {
+    className: "r muted"
+  }, uncatCount), /*#__PURE__*/React.createElement("td", {
+    className: "r muted"
+  }, "system"))))));
+}
 /* ============================ Reports & Export hub ============================ */
 function ReportsHub({
   db,
@@ -4790,6 +4952,389 @@ function Backup({
     }
   }, /*#__PURE__*/React.createElement("b", null, "Why this matters:"), " data is stored in your browser (localStorage). Clearing browser data, switching devices, or using private mode will lose it. Download a backup regularly, and keep it somewhere safe.")));
 }
+/* ============================ Report shared UI ============================ */
+function fyDefaults(db) {
+  // default period = fiscal year to date; default as-on = today
+  const start = db.profile && db.profile.fyStartAD || "";
+  return {
+    from: start || "",
+    to: today(),
+    ason: today()
+  };
+}
+function PeriodBar({
+  from,
+  to,
+  setFrom,
+  setTo,
+  onCSV
+}) {
+  return /*#__PURE__*/React.createElement("div", {
+    className: "hk-repbar hk-noprint"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "hk-repfilters"
+  }, /*#__PURE__*/React.createElement("label", null, "From ", /*#__PURE__*/React.createElement("input", {
+    type: "date",
+    value: from,
+    onChange: e => setFrom(e.target.value)
+  })), /*#__PURE__*/React.createElement("label", null, "To ", /*#__PURE__*/React.createElement("input", {
+    type: "date",
+    value: to,
+    onChange: e => setTo(e.target.value)
+  })), from && /*#__PURE__*/React.createElement("span", {
+    className: "hk-bsmini"
+  }, bsLabel(from)), from && to && /*#__PURE__*/React.createElement("span", {
+    className: "hk-bsmini"
+  }, "\u2192 ", bsLabel(to))), /*#__PURE__*/React.createElement("div", {
+    className: "hk-repactions"
+  }, /*#__PURE__*/React.createElement("button", {
+    className: "hk-btn alt",
+    onClick: onCSV
+  }, "\u2B07 Excel (CSV)"), /*#__PURE__*/React.createElement("button", {
+    className: "hk-btn",
+    onClick: () => window.print()
+  }, "\uD83D\uDDA8 PDF")));
+}
+function AsOnBar({
+  ason,
+  setAson,
+  onCSV
+}) {
+  return /*#__PURE__*/React.createElement("div", {
+    className: "hk-repbar hk-noprint"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "hk-repfilters"
+  }, /*#__PURE__*/React.createElement("label", null, "As on ", /*#__PURE__*/React.createElement("input", {
+    type: "date",
+    value: ason,
+    onChange: e => setAson(e.target.value)
+  })), /*#__PURE__*/React.createElement("span", {
+    className: "hk-bsmini"
+  }, bsLabel(ason))), /*#__PURE__*/React.createElement("div", {
+    className: "hk-repactions"
+  }, /*#__PURE__*/React.createElement("button", {
+    className: "hk-btn alt",
+    onClick: onCSV
+  }, "\u2B07 Excel (CSV)"), /*#__PURE__*/React.createElement("button", {
+    className: "hk-btn",
+    onClick: () => window.print()
+  }, "\uD83D\uDDA8 PDF")));
+}
+function ReportHead({
+  title,
+  line
+}) {
+  return /*#__PURE__*/React.createElement("div", {
+    className: "hk-rephead hk-printonly"
+  }, /*#__PURE__*/React.createElement("h2", null, title), /*#__PURE__*/React.createElement("div", {
+    className: "hk-repco"
+  }, line));
+}
+
+/* ============================ Trial Balance (as-on) ============================ */
+function RTrialBalance({
+  db,
+  flash
+}) {
+  const d = fyDefaults(db);
+  const [ason, setAson] = useState(d.ason);
+  const L = useMemo(() => computeLedger(db, {
+    to: ason
+  }), [db, ason]);
+  const rows = [];
+  let td = 0,
+    tc = 0;
+  db.accounts.forEach(a => {
+    const b = L.bal[a.id] || 0;
+    if (Math.abs(b) < 0.005) return;
+    const dr = TYPE_META[a.type].normal === "debit" ? b : -b;
+    const debit = dr > 0 ? dr : 0,
+      credit = dr < 0 ? -dr : 0;
+    td += debit;
+    tc += credit;
+    rows.push({
+      a,
+      debit,
+      credit
+    });
+  });
+  const csv = () => {
+    exportCSV("trial-balance-" + ason + ".csv", ["Code", "Account", "Debit", "Credit"], rows.map(r => [r.a.code, r.a.name, r.debit ? r.debit.toFixed(2) : "", r.credit ? r.credit.toFixed(2) : ""]).concat([["", "TOTAL", td.toFixed(2), tc.toFixed(2)]]));
+    flash("Exported.");
+  };
+  return /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement(H, {
+    title: "Trial Balance",
+    sub: "Account balances as on a chosen date."
+  }), /*#__PURE__*/React.createElement(AsOnBar, {
+    ason: ason,
+    setAson: setAson,
+    onCSV: csv
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "hk-card report"
+  }, /*#__PURE__*/React.createElement(ReportHead, {
+    title: "Trial Balance",
+    line: (db.profile.name || "") + " — as on " + ason + " (" + bsLabel(ason) + ")"
+  }), /*#__PURE__*/React.createElement("table", {
+    className: "hk-table"
+  }, /*#__PURE__*/React.createElement("thead", null, /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("th", null, "Code"), /*#__PURE__*/React.createElement("th", null, "Account"), /*#__PURE__*/React.createElement("th", {
+    className: "r"
+  }, "Debit"), /*#__PURE__*/React.createElement("th", {
+    className: "r"
+  }, "Credit"))), /*#__PURE__*/React.createElement("tbody", null, rows.map(r => /*#__PURE__*/React.createElement("tr", {
+    key: r.a.id
+  }, /*#__PURE__*/React.createElement("td", null, r.a.code), /*#__PURE__*/React.createElement("td", null, r.a.name), /*#__PURE__*/React.createElement("td", {
+    className: "r"
+  }, r.debit ? num(r.debit) : ""), /*#__PURE__*/React.createElement("td", {
+    className: "r"
+  }, r.credit ? num(r.credit) : "")))), /*#__PURE__*/React.createElement("tfoot", null, /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("td", null), /*#__PURE__*/React.createElement("td", null, "Total"), /*#__PURE__*/React.createElement("td", {
+    className: "r"
+  }, num(td)), /*#__PURE__*/React.createElement("td", {
+    className: "r"
+  }, num(tc))))), /*#__PURE__*/React.createElement("p", {
+    className: Math.abs(td - tc) < 0.01 ? "ok" : "bad"
+  }, Math.abs(td - tc) < 0.01 ? "Balanced ✓" : "Out by " + num(Math.abs(td - tc)))));
+}
+
+/* ============================ Profit & Loss (period) ============================ */
+function RProfitLoss({
+  db,
+  flash
+}) {
+  const d = fyDefaults(db);
+  const [from, setFrom] = useState(d.from);
+  const [to, setTo] = useState(d.to);
+  const L = useMemo(() => computeLedger(db, {
+    from,
+    to
+  }), [db, from, to]);
+  const income = db.accounts.filter(a => a.type === "income").map(a => [a, L.bal[a.id] || 0]).filter(([, b]) => Math.abs(b) > 0.005);
+  const expense = db.accounts.filter(a => a.type === "expense").map(a => [a, L.bal[a.id] || 0]).filter(([, b]) => Math.abs(b) > 0.005);
+  const totInc = income.reduce((s, [, b]) => s + b, 0),
+    totExp = expense.reduce((s, [, b]) => s + b, 0);
+  const gp = (L.bal[acc(db, "4010").id] || 0) - (L.bal[acc(db, "5010").id] || 0);
+  const ni = totInc - totExp;
+  const csv = () => {
+    const rows = [];
+    rows.push(["INCOME", ""]);
+    income.forEach(([a, b]) => rows.push([a.code + " " + a.name, b.toFixed(2)]));
+    rows.push(["Total Income", totInc.toFixed(2)]);
+    rows.push(["Gross Profit (Sales-COGS)", gp.toFixed(2)]);
+    rows.push(["EXPENSES", ""]);
+    expense.forEach(([a, b]) => rows.push([a.code + " " + a.name, b.toFixed(2)]));
+    rows.push(["Total Expenses", totExp.toFixed(2)]);
+    rows.push([ni >= 0 ? "NET PROFIT" : "NET LOSS", ni.toFixed(2)]);
+    exportCSV("profit-loss-" + from + "_to_" + to + ".csv", ["Account", "Amount"], rows);
+    flash("Exported.");
+  };
+  return /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement(H, {
+    title: "Profit & Loss",
+    sub: "Income statement for the selected period."
+  }), /*#__PURE__*/React.createElement(PeriodBar, {
+    from: from,
+    to: to,
+    setFrom: setFrom,
+    setTo: setTo,
+    onCSV: csv
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "hk-card report"
+  }, /*#__PURE__*/React.createElement(ReportHead, {
+    title: "Profit & Loss",
+    line: (db.profile.name || "") + " — " + from + " to " + to
+  }), /*#__PURE__*/React.createElement(Section, {
+    title: "Income",
+    rows: income,
+    total: totInc
+  }), /*#__PURE__*/React.createElement(Row, {
+    label: "Gross Profit (Sales \u2212 COGS)",
+    val: gp,
+    strong: true
+  }), /*#__PURE__*/React.createElement(Section, {
+    title: "Expenses",
+    rows: expense,
+    total: totExp
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "hk-net " + (ni >= 0 ? "pos" : "neg")
+  }, /*#__PURE__*/React.createElement("span", null, "Net ", ni >= 0 ? "Profit" : "Loss"), /*#__PURE__*/React.createElement("b", null, NRS(ni)))));
+}
+
+/* ============================ Balance Sheet (as-on) ============================ */
+function RBalanceSheet({
+  db,
+  flash
+}) {
+  const d = fyDefaults(db);
+  const [ason, setAson] = useState(d.ason);
+  const L = useMemo(() => computeLedger(db, {
+    to: ason
+  }), [db, ason]);
+  const ni = netIncome(L, db);
+  const assets = db.accounts.filter(a => a.type === "asset").map(a => [a, (a.contra ? -1 : 1) * (L.bal[a.id] || 0)]).filter(([, b]) => Math.abs(b) > 0.005);
+  const liab = db.accounts.filter(a => a.type === "liability").map(a => [a, L.bal[a.id] || 0]).filter(([, b]) => Math.abs(b) > 0.005);
+  const eq = db.accounts.filter(a => a.type === "equity").map(a => [a, (a.contra ? -1 : 1) * (L.bal[a.id] || 0)]).filter(([, b]) => Math.abs(b) > 0.005);
+  const totA = assets.reduce((s, [, b]) => s + b, 0),
+    totL = liab.reduce((s, [, b]) => s + b, 0),
+    totE = eq.reduce((s, [, b]) => s + b, 0) + ni;
+  const diff = totA - (totL + totE);
+  const csv = () => {
+    const rows = [];
+    const sec = (t, list) => {
+      rows.push([t.toUpperCase(), ""]);
+      list.forEach(([a, b]) => rows.push([a.code + " " + a.name, b.toFixed(2)]));
+    };
+    sec("Assets", assets);
+    rows.push(["Total Assets", totA.toFixed(2)]);
+    sec("Liabilities", liab);
+    rows.push(["Total Liabilities", totL.toFixed(2)]);
+    sec("Equity", eq);
+    rows.push(["Current Period Earnings", ni.toFixed(2)]);
+    rows.push(["Total Equity", totE.toFixed(2)]);
+    exportCSV("balance-sheet-" + ason + ".csv", ["Account", "Amount"], rows);
+    flash("Exported.");
+  };
+  return /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement(H, {
+    title: "Balance Sheet",
+    sub: "Financial position as on a chosen date."
+  }), /*#__PURE__*/React.createElement(AsOnBar, {
+    ason: ason,
+    setAson: setAson,
+    onCSV: csv
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "hk-card report"
+  }, /*#__PURE__*/React.createElement(ReportHead, {
+    title: "Balance Sheet",
+    line: (db.profile.name || "") + " — as on " + ason + " (" + bsLabel(ason) + ")"
+  }), /*#__PURE__*/React.createElement(Section, {
+    title: "Assets",
+    rows: assets,
+    total: totA
+  }), /*#__PURE__*/React.createElement(Section, {
+    title: "Liabilities",
+    rows: liab,
+    total: totL
+  }), /*#__PURE__*/React.createElement(Section, {
+    title: "Equity",
+    rows: [...eq, [{
+      id: "ni",
+      code: "",
+      name: "Current Period Earnings"
+    }, ni]],
+    total: totE
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "hk-net " + (Math.abs(diff) < 0.01 ? "pos" : "neg")
+  }, /*#__PURE__*/React.createElement("span", null, "Assets vs Liabilities + Equity"), /*#__PURE__*/React.createElement("b", null, Math.abs(diff) < 0.01 ? "Balanced ✓" : "Out by " + NRS(Math.abs(diff))))));
+}
+
+/* ============================ Cash Flow (period) ============================ */
+function RCashFlow({
+  db,
+  flash
+}) {
+  const d = fyDefaults(db);
+  const [from, setFrom] = useState(d.from);
+  const [to, setTo] = useState(d.to);
+  const cashIds = [acc(db, "1010").id, acc(db, "1020").id];
+  const inRange = dt => (!from || dt >= from) && (!to || dt <= to);
+  let op = 0,
+    inv = 0,
+    fin = 0;
+  db.journal.forEach(e => {
+    if (!inRange(e.date || "")) return;
+    const cl = e.lines.filter(l => cashIds.includes(l.accId));
+    if (!cl.length) return;
+    const delta = cl.reduce((s, l) => s + (Number(l.debit) || 0) - (Number(l.credit) || 0), 0);
+    if (Math.abs(delta) < 0.005) return;
+    if (e.ref === "ASSET" || e.lines.some(l => acc(db, "1500").id === l.accId)) inv += delta;else if (e.lines.some(l => [acc(db, "3010").id, acc(db, "3020").id, acc(db, "2400").id].includes(l.accId))) fin += delta;else op += delta;
+  });
+  const net = op + inv + fin;
+  const Lto = useMemo(() => computeLedger(db, {
+    to
+  }), [db, to]);
+  const cashNow = (Lto.bal[cashIds[0]] || 0) + (Lto.bal[cashIds[1]] || 0);
+  const csv = () => {
+    exportCSV("cash-flow-" + from + "_to_" + to + ".csv", ["Activity", "Amount"], [["Operating", op.toFixed(2)], ["Investing", inv.toFixed(2)], ["Financing", fin.toFixed(2)], ["Net change", net.toFixed(2)], ["Cash & bank as on " + to, cashNow.toFixed(2)]]);
+    flash("Exported.");
+  };
+  return /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement(H, {
+    title: "Cash Flow",
+    sub: "Cash & bank movement for the selected period."
+  }), /*#__PURE__*/React.createElement(PeriodBar, {
+    from: from,
+    to: to,
+    setFrom: setFrom,
+    setTo: setTo,
+    onCSV: csv
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "hk-card report"
+  }, /*#__PURE__*/React.createElement(ReportHead, {
+    title: "Cash Flow",
+    line: (db.profile.name || "") + " — " + from + " to " + to
+  }), /*#__PURE__*/React.createElement(Row, {
+    label: "Operating activities",
+    val: op,
+    strong: true
+  }), /*#__PURE__*/React.createElement(Row, {
+    label: "Investing activities (assets)",
+    val: inv,
+    strong: true
+  }), /*#__PURE__*/React.createElement(Row, {
+    label: "Financing activities (capital/loans/drawings)",
+    val: fin,
+    strong: true
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "hk-net " + (net >= 0 ? "pos" : "neg")
+  }, /*#__PURE__*/React.createElement("span", null, "Net change in cash"), /*#__PURE__*/React.createElement("b", null, NRS(net))), /*#__PURE__*/React.createElement(Row, {
+    label: "Cash & bank as on " + to,
+    val: cashNow,
+    strong: true
+  })));
+}
+
+/* ============================ Day Book (period) ============================ */
+function RDayBook({
+  db,
+  flash
+}) {
+  const d = fyDefaults(db);
+  const [from, setFrom] = useState(d.from);
+  const [to, setTo] = useState(d.to);
+  const byId = {};
+  db.accounts.forEach(a => byId[a.id] = a);
+  const inRange = dt => (!from || dt >= from) && (!to || dt <= to);
+  const rows = db.journal.filter(e => inRange(e.date || "")).sort((a, b) => b.date.localeCompare(a.date));
+  const csv = () => {
+    const out = [];
+    [...rows].reverse().forEach(e => e.lines.forEach(l => out.push([e.date, bsLabel(e.date), e.ref, e.memo, byId[l.accId] ? byId[l.accId].code + " " + byId[l.accId].name : "", (Number(l.debit) || 0).toFixed(2), (Number(l.credit) || 0).toFixed(2)])));
+    exportCSV("day-book-" + from + "_to_" + to + ".csv", ["Date AD", "Date BS", "Ref", "Memo", "Account", "Debit", "Credit"], out);
+    flash("Exported.");
+  };
+  return /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement(H, {
+    title: "Day Book",
+    sub: "All vouchers within the selected period."
+  }), /*#__PURE__*/React.createElement(PeriodBar, {
+    from: from,
+    to: to,
+    setFrom: setFrom,
+    setTo: setTo,
+    onCSV: csv
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "hk-card report"
+  }, /*#__PURE__*/React.createElement(ReportHead, {
+    title: "Day Book",
+    line: (db.profile.name || "") + " — " + from + " to " + to
+  }), rows.length === 0 ? /*#__PURE__*/React.createElement(Empty, {
+    msg: "No entries in this period."
+  }) : /*#__PURE__*/React.createElement("table", {
+    className: "hk-table"
+  }, /*#__PURE__*/React.createElement("thead", null, /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("th", null, "Date"), /*#__PURE__*/React.createElement("th", null, "BS"), /*#__PURE__*/React.createElement("th", null, "Ref"), /*#__PURE__*/React.createElement("th", null, "Memo"), /*#__PURE__*/React.createElement("th", null, "Lines"))), /*#__PURE__*/React.createElement("tbody", null, rows.map(e => /*#__PURE__*/React.createElement("tr", {
+    key: e.id
+  }, /*#__PURE__*/React.createElement("td", null, e.date), /*#__PURE__*/React.createElement("td", {
+    className: "muted"
+  }, bsLabel(e.date)), /*#__PURE__*/React.createElement("td", null, e.ref), /*#__PURE__*/React.createElement("td", null, e.memo), /*#__PURE__*/React.createElement("td", {
+    className: "mini"
+  }, e.lines.map((l, i) => /*#__PURE__*/React.createElement("div", {
+    key: i
+  }, byId[l.accId] ? byId[l.accId].code + " " + byId[l.accId].name : "?", ": ", Number(l.debit) ? "Dr " + num(l.debit) : "Cr " + num(l.credit))))))))));
+}
 /* ============================ Styles ============================ */
 function Style() {
   return /*#__PURE__*/React.createElement("style", null, `
@@ -4963,6 +5508,21 @@ function Style() {
   .hk-exportgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px}
   .hk-exportbtn{padding:14px;border:1px solid var(--line);background:var(--card);border-radius:10px;cursor:pointer;font-size:13.5px;color:var(--ink);text-align:left}
   .hk-exportbtn:hover{border-color:var(--green);background:color-mix(in srgb,var(--green) 6%,transparent)}
+  .hk-catsel{font-size:12.5px;padding:5px 8px}
+  .hk-repbar{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-bottom:14px}
+  .hk-repfilters{display:flex;gap:14px;align-items:center;flex-wrap:wrap}
+  .hk-repfilters label{font-size:13px;color:var(--ink2);display:flex;gap:6px;align-items:center}
+  .hk-repfilters input{width:auto}
+  .hk-bsmini{font-size:11.5px;color:var(--teal)}
+  .hk-repactions{display:flex;gap:8px}
+  .hk-printonly{display:none}
+  .hk-rephead h2{font-family:Georgia,serif;margin:0 0 2px;color:var(--green)}
+  .hk-repco{color:var(--ink2);font-size:13px;margin-bottom:10px}
+  @media print{
+    .hk-printonly{display:block}
+    .hk-h,.hk-repbar{display:none !important}
+    .report{border:none}
+  }
   @media(max-width:760px){.hk-dashgrid{grid-template-columns:1fr}}
   `);
 }
