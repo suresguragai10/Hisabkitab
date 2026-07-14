@@ -1,0 +1,24 @@
+{
+  "name": "hisabkitab",
+  "private": true,
+  "version": "6.1.0",
+  "type": "module",
+  "description": "Cloud accounting for Nepali business — Supabase backend with OTP login.",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "deploy": "gh-pages -d dist"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.45.4",
+    "jsdom": "^29.1.1",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.3.1",
+    "gh-pages": "^6.1.1",
+    "vite": "^5.4.0"
+  }
+}
