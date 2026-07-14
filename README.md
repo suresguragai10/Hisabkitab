@@ -10,33 +10,40 @@ The project is under active correction and is **not yet ready for production boo
 - `PRODUCT_AUDIT.md` — source-code and accounting audit
 - `hisabkitab-erp-roadmap.md` — original feature roadmap
 
-## Stage 1 and Stage 2 improvements included
+## Included remediation stages
 
-This revision restores the manual voucher workflow:
+### Stage 1 — Manual vouchers
 
-- Real Journal, Payment, Receipt, and Contra entry form
-- Multi-line debit and credit entry
-- Balanced-voucher validation
-- Atomic database posting for voucher header and lines
-- Account ownership and active-account validation
-- Safer sequential voucher numbering under concurrent posting
-- In-app void dialog with a required reason
-- Sales and purchase vouchers protected from direct voiding in the general voucher list
-- Separate receipt/payment records and document allocations
-- Correct partial-payment, paid, overdue, and outstanding calculations
-- Payment history with controlled allocation reversal
-- Allocation-based invoice, purchase, dashboard, and sales-report totals
+- Balanced Journal, Payment, Receipt, and Contra vouchers
+- Atomic posting, ownership validation, safer numbering, and controlled voiding
+
+### Stage 2 — Payment allocations
+
+- Separate payment and allocation records
+- Accurate partial-payment, paid, overdue, and outstanding balances
+- Payment history and controlled allocation reversals
+
+### Stage 3 — Perpetual inventory
+
+- Moving weighted-average valuation
+- Tracked purchases debit Inventory Asset
+- Tracked sales debit COGS and credit Inventory Asset
+- Valued opening stock and damage/shrinkage adjustments
+- Stock ledger with quantity/value balances
+- Live reconciliation of stock valuation to the Inventory Asset ledger
+- Inventory cutover-date and chronological movement controls
 
 ## Database setup
 
-Use a separate staging Supabase project first. Apply the existing SQL files in their intended phase order, then apply:
+Use a separate staging Supabase project first. Apply the existing SQL files in their intended phase order, then apply the remediation migrations in order:
 
 ```text
 sql/phaseP0_1_manual_vouchers.sql
 sql/phaseP0_2_payment_allocations.sql
+sql/phaseP0_3_inventory_cogs.sql
 ```
 
-The Stage 1 migration replaces `post_voucher` with a safer version and adds `void_manual_voucher`. The Stage 2 migration adds payment/allocation tables, derived balances, payment history, over-allocation protection, and controlled reversals.
+Run `sql/phaseP0_3_inventory_cogs_preflight.sql` before Stage 3, then run each matching verification script after its migration. Stage 3 initializes existing quantities and values but does not automatically post a catch-up journal; review the Inventory reconciliation in staging first.
 
 Do not apply migrations directly to production without a database backup and a staging test.
 
@@ -63,28 +70,16 @@ The current build succeeds, although Vite reports that the main JavaScript bundl
 
 Supabase configuration currently lives in `src/config.js`. Use environment variables and separate credentials for development, staging, and production before a commercial release.
 
-## Stage 1 verification
+## Stage 3 verification
 
-After applying the Stage 1 migration:
+After applying the Stage 3 migration, run:
 
-1. Open **Accounting → Vouchers**.
-2. Create a journal with one debit and one credit of the same amount.
-3. Confirm it appears once in Recent Vouchers.
-4. Confirm both account ledgers contain the entry.
-5. Try to save an unbalanced entry and confirm it is rejected.
-6. Void the test journal with a reason and confirm ledger reports exclude it.
+```text
+sql/phaseP0_3_inventory_cogs_verify.sql
+```
 
-## Stage 2 verification
-
-After applying the Stage 2 migration in staging:
-
-1. Create an NPR 100 invoice and record an NPR 1 receipt.
-2. Confirm NPR 1 is collected and NPR 99 remains outstanding.
-3. Complete the payment and confirm the status becomes Paid.
-4. Attempt an overpayment and confirm it is rejected.
-5. Reverse an allocation with a reason and confirm both the document balance and ledger are restored.
-6. Repeat the same tests for a purchase bill.
+Then complete the weighted-average purchase, sale, damage, and reconciliation test in `STAGE3_IMPLEMENTATION_NOTES.md`.
 
 ## Next priority
 
-The next development stage is inventory and Cost of Goods Sold accounting. Do not use the product for live trading-business books until Stage 3 reconciles stock valuation to the Inventory Asset ledger.
+Stage 4 will add controlled posted-document cancellation/reversal and complete credit/debit-note return workflows. Full returns must not be simulated with a manual stock adjustment because VAT and receivable/payable balances must reverse with the stock.

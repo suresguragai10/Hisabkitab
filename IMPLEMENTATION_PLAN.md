@@ -48,41 +48,21 @@ Status: **started in this revision**
 
 ## Stage 2 — Make payments accurate
 
-Status: **implemented in version 6.1.0; database acceptance testing still required**
+Status: **implemented in v6.1.0; database acceptance completed**
 
-1. Added `document_payments` and `payment_allocations` tables.
-2. Every receipt and payment is stored separately and linked to its posting voucher.
-3. Paid and outstanding amounts are derived from active allocations.
-4. Added Open, Partial, Paid, Overdue, Cancelled, and Credited statuses.
-5. Replaced the unsafe settlement implementation with concurrency-safe allocation checks.
-6. Added payment history to invoice and purchase payment dialogs.
-7. Added controlled allocation reversal with a required reason and reversing voucher.
-8. Updated invoice, purchase, dashboard, and sales-report totals to use allocations.
-
-**Files changed:**
-
-- `sql/phaseP0_2_payment_allocations.sql`
-- `src/lib/posting.js`
-- `src/pages/PaymentModal.jsx`
-- `src/pages/Invoices.jsx`
-- `src/pages/Purchases.jsx`
-- `src/pages/Reports.jsx`
-- `src/pages/Dashboard.jsx`
-- `src/App.jsx`
-
-**Manual test:**
-
-1. Back up the database and apply `phaseP0_2_payment_allocations.sql` in staging.
-2. Create an NPR 100 invoice and record an NPR 1 receipt.
-3. Confirm status is Partial (or Overdue when past due), paid is NPR 1, and outstanding is NPR 99.
-4. Record NPR 99 and confirm status becomes Paid.
-5. Try to allocate more than the outstanding amount and confirm the RPC rejects it.
-6. Reverse the NPR 99 allocation with a reason and confirm the document returns to Partial and the ledger contains the reversal voucher.
-7. Repeat the same sequence for a purchase bill.
+1. Add `document_payments` and `payment_allocations` tables.
+2. Store every receipt and payment separately.
+3. Calculate paid amount and outstanding amount from allocations.
+4. Add Open, Partially Paid, Paid, Overdue, Cancelled, and Credited statuses.
+5. Stop the current settlement function from marking a partly paid document as fully paid.
+6. Add payment history to invoice and purchase detail screens.
+7. Add safe reversal of a payment allocation.
 
 **Exit condition:** paying NPR 1 against an NPR 100 invoice leaves NPR 99 outstanding.
 
 ## Stage 3 — Correct inventory accounting
+
+Status: **core perpetual inventory implemented in v6.2.0; source/build checks passed; staging acceptance required**
 
 1. Choose and document the inventory method: perpetual inventory is recommended.
 2. Add Inventory Asset, Cost of Goods Sold, Stock Adjustment, and Purchase Return accounts.
@@ -91,6 +71,7 @@ Status: **implemented in version 6.1.0; database acceptance testing still requir
 5. On purchase: debit Inventory Asset rather than Purchase Expense for stock items.
 6. Handle sales returns, purchase returns, damaged stock, and opening stock.
 7. Reconcile stock valuation to the Inventory Asset ledger.
+8. Enforce a valuation cutover date and reject backdated movements that would invalidate moving-average history.
 
 **Exit condition:** stock valuation equals the related general-ledger balance.
 
@@ -171,4 +152,4 @@ Every report should support date range, fiscal year, export, drill-down, and tot
 
 ## Immediate next development task
 
-After Stage 2 passes staging acceptance tests, implement **Stage 3: inventory and Cost of Goods Sold accounting**. This is now the highest remaining financial-statement risk.
+Apply and accept the Stage 3 migration in staging. After the stock-to-ledger reconciliation and weighted-average acceptance test pass, proceed to **Stage 4: controlled document lifecycle and complete credit/debit-note returns**.

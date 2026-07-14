@@ -403,7 +403,7 @@ const NAV_SECTIONS = [
   ]},
   // P3 Masters Unification — "Contacts" replaces "Parties" and gets its
   // own section. "Items" splits from Inventory: the master lives here,
-  // stock-movement/closing-stock UI stays in Inventory.
+  // controlled stock movement and reconciliation UI stays in Inventory.
   { section: "Contacts", tabs: [
     { key: "contacts", i18n: "contacts", icon: "👥", label: "Contacts", access: ()=>true },
   ]},

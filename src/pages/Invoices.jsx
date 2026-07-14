@@ -9,7 +9,7 @@ import { useBusinessProfile } from "../lib/businessProfile";
 import { adToBs, formatDualDate, BS_MONTHS_EN } from "../lib/nepaliCalendar";
 
 const VAT_RATE = 13;
-const blankLine = () => ({ description: "", quantity: "1", unit: "pcs", rate: "", vatRate: VAT_RATE });
+const blankLine = () => ({ itemId: "", description: "", quantity: "1", unit: "pcs", rate: "", vatRate: VAT_RATE });
 
 // ── helpers ──────────────────────────────────────────────────
 async function nextInvoiceNumber(fiscalYear) {
@@ -28,7 +28,7 @@ async function listInvoices() {
 }
 
 async function fetchItems() {
-  const { data, error } = await supabase.from("inventory_items").select("id,name,unit,selling_price,current_stock").eq("is_active",true).order("name");
+  const { data, error } = await supabase.from("inventory_items").select("id,name,unit,selling_price,current_stock,hsn_code,track_inventory,item_type").eq("is_active",true).order("name");
   if (error) return [];
   return data;
 }
@@ -322,6 +322,7 @@ export default function Invoices({ userId }) {
       const invoiceNumber = await nextInvoiceNumber(fiscalYear);
       const postLines = validLines.map(l => ({
         item_id:     l.itemId || null,
+        hsn_code:    items.find((item) => item.id === l.itemId)?.hsn_code || null,
         description: l.description,
         quantity:    parseFloat(l.quantity) || 1,
         unit:        l.unit || "pcs",

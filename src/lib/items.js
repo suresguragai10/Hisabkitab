@@ -3,6 +3,7 @@
 // ============================================================
 
 import { supabase } from "../supabase";
+import { currentFiscalYear } from "./fiscalYear";
 
 // ── Categories ─────────────────────────────────────────────
 
@@ -98,6 +99,8 @@ export async function createItem(fields) {
     p_opening_stock_value: Number(fields.openingStockValue) || 0,
     p_reorder_level:       Number(fields.reorderLevel) || 0,
     p_description:         fields.description || null,
+    p_opening_date:        new Date().toISOString().slice(0, 10),
+    p_fiscal_year:         currentFiscalYear(),
   });
   if (error) throw error;
   return data;

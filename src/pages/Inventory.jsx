@@ -1,373 +1,382 @@
-import React, { useEffect, useState } from "react";
-import { supabase } from "../supabase";
+import React, { useEffect, useMemo, useState } from "react";
+import {
+  getInventoryReconciliation,
+  listInventoryItems,
+  listInventoryMovements,
+  recordInventoryAdjustment,
+  reconcileInventoryLedger,
+} from "../lib/inventory";
+import { currentFiscalYear } from "../lib/fiscalYear";
 
-// ── DB helpers ────────────────────────────────────────────────
-async function listItems() {
-  const { data, error } = await supabase
-    .from("inventory_items")
-    .select("*")
-    .order("name");
-  if (error) throw error;
-  return data;
-}
+const TODAY = () => new Date().toISOString().slice(0, 10);
+const fmt = (n, digits = 2) => Number(n || 0).toLocaleString("en-IN", {
+  minimumFractionDigits: digits,
+  maximumFractionDigits: digits,
+});
 
-async function listMovements(itemId) {
-  const { data, error } = await supabase
-    .from("inventory_movements")
-    .select("*")
-    .eq("item_id", itemId)
-    .order("movement_date", { ascending: false })
-    .limit(50);
-  if (error) throw error;
-  return data;
-}
+const REASONS = [
+  { value: "adjustment_in", label: "Stock In / Correction", direction: "in", cost: true },
+  { value: "adjustment_out", label: "Stock Out / Correction", direction: "out", cost: false },
+  { value: "damage", label: "Damaged / Written Off", direction: "out", cost: false },
+  { value: "opening", label: "Opening Stock / Opening Correction", direction: "in", cost: true },
+];
 
-async function saveItem(userId, item) {
-  const { data, error } = await supabase
-    .from("inventory_items")
-    .insert({ user_id: userId, ...item })
-    .select().single();
-  if (error) throw error;
-  return data;
-}
+function ReconciliationPanel({ stats, loading, onRefresh, onReconciled }) {
+  const [show, setShow] = useState(false);
+  const [date, setDate] = useState(TODAY());
+  const [reason, setReason] = useState("Stage 3 opening inventory reconciliation");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState(null);
+  const [ok, setOk] = useState(null);
 
-async function recordMovement(userId, movement) {
-  const { data, error } = await supabase
-    .from("inventory_movements")
-    .insert({ user_id: userId, ...movement })
-    .select().single();
-  if (error) throw error;
-  // update current stock
-  const delta = movement.movement_type === "in" ? movement.quantity : -movement.quantity;
-  await supabase.rpc("update_stock", { p_item_id: movement.item_id, p_delta: delta });
-  return data;
-}
-
-async function updateItem(id, patch) {
-  const { error } = await supabase.from("inventory_items").update(patch).eq("id", id);
-  if (error) throw error;
-}
-
-// ── Main Inventory page ───────────────────────────────────────
-// ── Closing Stock panel — posts stock value to the ledger ─────
-function ClosingStockPanel({ totalStockValue, onPosted }) {
-  const [show, setShow]   = useState(false);
-  const [amount, setAmount] = useState("");
-  const [date, setDate]   = useState(new Date().toISOString().slice(0,10));
-  const [notes, setNotes] = useState("");
-  const [busy, setBusy]   = useState(false);
-  const [err, setErr]     = useState(null);
-  const [ok, setOk]       = useState(null);
-
-  const currentFY = () => {
-    const d = new Date();
-    return d.getMonth() >= 6 ? `${d.getFullYear()}/${String(d.getFullYear()+1).slice(2)}` : `${d.getFullYear()-1}/${String(d.getFullYear()).slice(2)}`;
-  };
+  const difference = Number(stats?.difference || 0);
+  const balanced = Math.abs(difference) <= 0.005;
 
   const post = async () => {
-    const amt = parseFloat(amount) || totalStockValue;
-    if (amt <= 0) { setErr("Enter a valid closing stock amount."); return; }
+    if (reason.trim().length < 5) {
+      setErr("Enter a clear reconciliation reason.");
+      return;
+    }
     setBusy(true); setErr(null); setOk(null);
     try {
-      const { error } = await supabase.rpc("post_closing_stock", {
-        p_date: date, p_amount: amt, p_fiscal_year: currentFY(),
-        p_notes: notes.trim() || "Closing stock valuation adjustment",
+      const voucherId = await reconcileInventoryLedger({
+        date,
+        fiscalYear: currentFiscalYear(),
+        reason: reason.trim(),
       });
-      if (error) throw error;
-      setOk(`Posted NPR ${amt.toLocaleString()} closing stock — check Balance Sheet & P&L.`);
+      setOk(voucherId
+        ? "Inventory Asset was reconciled to the current stock valuation."
+        : "No entry was needed; inventory already reconciles.");
       setShow(false);
-      onPosted && onPosted();
-    } catch(e) { setErr(e.message); }
+      await onReconciled();
+    } catch (e) {
+      setErr(e.message);
+    }
     setBusy(false);
   };
 
   return (
-    <div className="settings-info-box" style={{marginBottom:16,background:"#fdf6e3",borderLeftColor:"var(--gold)"}}>
-      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8}}>
+    <div className="settings-info-box" style={{ marginBottom: 16, borderLeftColor: balanced ? "var(--green2)" : "var(--gold)" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "flex-start", flexWrap: "wrap" }}>
         <div>
-          <b>Closing Stock:</b> your current stock is valued at <b>NPR {totalStockValue.toLocaleString()}</b> (weighted average cost).
-          Post this to your books so it appears on the Balance Sheet and correctly reduces Cost of Goods Sold in Profit &amp; Loss.
+          <b>Inventory ↔ General Ledger reconciliation</b>
+          <div className="muted" style={{ marginTop: 4 }}>
+            Perpetual inventory using moving weighted-average cost. Purchases debit Inventory Asset; sales post COGS automatically.
+          </div>
         </div>
-        <button className="ghost-btn" onClick={()=>{setShow(s=>!s); setAmount(String(totalStockValue));}}>
-          {show ? "Cancel" : "Post Closing Stock →"}
-        </button>
+        <button className="ghost-btn" onClick={onRefresh} disabled={loading}>{loading ? "Checking…" : "Refresh"}</button>
       </div>
 
-      {show && (
-        <div style={{marginTop:12,display:"flex",gap:10,flexWrap:"wrap",alignItems:"flex-end"}}>
-          <label className="fld" style={{margin:0}}>
-            Amount (NPR)
-            <input type="number" step="0.01" value={amount} onChange={e=>setAmount(e.target.value)} />
+      {stats && (
+        <>
+          <div className="stat-row" style={{ marginTop: 12 }}>
+            <div className="stat"><span>NPR {fmt(stats.stock_valuation)}</span>Stock valuation</div>
+            <div className="stat"><span>NPR {fmt(stats.inventory_ledger_balance)}</span>Inventory Asset ledger</div>
+            <div className="stat">
+              <span style={{ color: balanced ? "var(--green2)" : "var(--rust)" }}>NPR {fmt(difference)}</span>
+              Difference
+            </div>
+            <div className="stat"><span>{Number(stats.legacy_movements || 0)}</span>Legacy movements</div>
+          </div>
+
+          {balanced ? (
+            <p className="msg ok" style={{ marginTop: 10 }}>✓ Stock valuation equals the Inventory Asset ledger.</p>
+          ) : (
+            <div className="msg err" style={{ marginTop: 10 }}>
+              <b>Reconciliation required.</b> Review legacy stock and costs before posting the one-time balancing entry.
+              <button className="link" style={{ marginLeft: 8 }} onClick={() => setShow((v) => !v)}>
+                {show ? "Cancel" : "Post reviewed reconciliation"}
+              </button>
+            </div>
+          )}
+
+          {Number(stats.unvalued_stock_items || 0) > 0 && (
+            <p className="msg err">{stats.unvalued_stock_items} tracked item(s) have positive quantity but zero value.</p>
+          )}
+          {Number(stats.negative_stock_items || 0) > 0 && (
+            <p className="msg err">{stats.negative_stock_items} tracked item(s) have negative stock and must be corrected.</p>
+          )}
+        </>
+      )}
+
+      {show && !balanced && (
+        <div style={{ marginTop: 12, display: "flex", gap: 10, flexWrap: "wrap", alignItems: "flex-end" }}>
+          <label className="fld" style={{ margin: 0 }}>
+            Posting date
+            <input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
           </label>
-          <label className="fld" style={{margin:0}}>
-            As of Date
-            <input type="date" value={date} onChange={e=>setDate(e.target.value)} />
+          <label className="fld" style={{ margin: 0, flex: "1 1 300px" }}>
+            Reason
+            <input value={reason} onChange={(e) => setReason(e.target.value)} />
           </label>
-          <label className="fld" style={{margin:0,flex:"1 1 180px"}}>
-            Notes
-            <input placeholder="Optional" value={notes} onChange={e=>setNotes(e.target.value)} />
-          </label>
-          <button className="btn" onClick={post} disabled={busy}>{busy?"Posting…":"Post Entry"}</button>
+          <button className="btn" onClick={post} disabled={busy}>{busy ? "Posting…" : "Post Reconciliation"}</button>
         </div>
       )}
-      {err && <p className="msg err" style={{marginTop:8}}>{err}</p>}
-      {ok  && <p className="msg ok"  style={{marginTop:8}}>{ok}</p>}
+      {err && <p className="msg err" style={{ marginTop: 8 }}>{err}</p>}
+      {ok && <p className="msg ok" style={{ marginTop: 8 }}>{ok}</p>}
     </div>
   );
 }
 
-export default function Inventory({ userId }) {
+export default function Inventory() {
   const [items, setItems] = useState([]);
+  const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [reconLoading, setReconLoading] = useState(false);
   const [err, setErr] = useState(null);
-  const [showItemForm, setShowItemForm] = useState(false);
   const [showMoveForm, setShowMoveForm] = useState(false);
   const [selectedItem, setSelectedItem] = useState(null);
   const [movements, setMovements] = useState([]);
   const [movLoading, setMovLoading] = useState(false);
   const [busy, setBusy] = useState(false);
   const [filter, setFilter] = useState("all");
-
-  const [itemForm, setItemForm] = useState({
-    name: "", category: "", unit: "pcs", reorder_level: "0",
-    cost_price: "", selling_price: "", description: "",
-  });
-
   const [moveForm, setMoveForm] = useState({
-    itemId: "", movementType: "in", quantity: "", rate: "",
-    movementDate: new Date().toISOString().slice(0,10),
-    reference: "", notes: "",
+    itemId: "",
+    reasonType: "adjustment_in",
+    quantity: "",
+    unitCost: "",
+    movementDate: TODAY(),
+    reference: "",
+    notes: "",
   });
+
+  const loadReconciliation = async () => {
+    setReconLoading(true);
+    try {
+      setStats(await getInventoryReconciliation());
+    } catch (e) {
+      setErr(e.message);
+    }
+    setReconLoading(false);
+  };
 
   const load = async () => {
-    setLoading(true);
-    try { setItems(await listItems()); setErr(null); }
-    catch(e) { setErr(e.message); }
+    setLoading(true); setErr(null);
+    try {
+      const [rows, reconciliation] = await Promise.all([
+        listInventoryItems(),
+        getInventoryReconciliation(),
+      ]);
+      setItems(rows);
+      setStats(reconciliation);
+    } catch (e) {
+      setErr(e.message);
+    }
     setLoading(false);
   };
 
   useEffect(() => { load(); }, []);
 
   const loadMovements = async (item) => {
-    setSelectedItem(item);
-    setMovLoading(true);
-    try { setMovements(await listMovements(item.id)); }
-    catch(e) { setErr(e.message); }
+    setSelectedItem(item); setMovLoading(true); setErr(null);
+    try {
+      setMovements(await listInventoryMovements(item.id));
+    } catch (e) {
+      setErr(e.message);
+    }
     setMovLoading(false);
   };
 
-  const submitItem = async (e) => {
+  const submitMovement = async (e) => {
     e.preventDefault();
-    if (!itemForm.name.trim()) { setErr("Item name required."); return; }
-    setBusy(true); setErr(null);
-    try {
-      await saveItem(userId, {
-        name: itemForm.name.trim(),
-        category: itemForm.category.trim() || "General",
-        unit: itemForm.unit.trim() || "pcs",
-        reorder_level: parseFloat(itemForm.reorder_level) || 0,
-        cost_price: parseFloat(itemForm.cost_price) || 0,
-        selling_price: parseFloat(itemForm.selling_price) || 0,
-        description: itemForm.description.trim() || null,
-        current_stock: 0,
-      });
-      setItemForm({ name:"", category:"", unit:"pcs", reorder_level:"0", cost_price:"", selling_price:"", description:"" });
-      setShowItemForm(false);
-      await load();
-    } catch(e) { setErr(e.message); }
-    setBusy(false);
-  };
-
-  const submitMove = async (e) => {
-    e.preventDefault();
+    const quantity = Number(moveForm.quantity);
     if (!moveForm.itemId) { setErr("Select an item."); return; }
-    if (!parseFloat(moveForm.quantity)) { setErr("Enter quantity."); return; }
-    // check stock for out movement
-    const item = items.find(i => i.id === moveForm.itemId);
-    if (moveForm.movementType === "out" && item && Number(item.current_stock) < parseFloat(moveForm.quantity)) {
-      setErr(`Insufficient stock. Current stock: ${item.current_stock} ${item.unit}`);
+    if (!(quantity > 0)) { setErr("Quantity must be positive."); return; }
+
+    const reason = REASONS.find((r) => r.value === moveForm.reasonType);
+    const item = items.find((i) => i.id === moveForm.itemId);
+    if (reason?.direction === "out" && item && Number(item.current_stock) + 0.0005 < quantity) {
+      setErr(`Insufficient stock. Available: ${item.current_stock} ${item.unit}.`);
       return;
     }
+
     setBusy(true); setErr(null);
     try {
-      await recordMovement(userId, {
-        item_id: moveForm.itemId,
-        movement_type: moveForm.movementType,
-        quantity: parseFloat(moveForm.quantity),
-        rate: parseFloat(moveForm.rate) || 0,
-        movement_date: moveForm.movementDate,
-        reference: moveForm.reference.trim() || null,
-        notes: moveForm.notes.trim() || null,
+      await recordInventoryAdjustment({
+        itemId: moveForm.itemId,
+        reasonType: moveForm.reasonType,
+        quantity,
+        unitCost: reason?.cost ? Number(moveForm.unitCost || 0) : null,
+        date: moveForm.movementDate,
+        fiscalYear: currentFiscalYear(),
+        reference: moveForm.reference.trim(),
+        notes: moveForm.notes.trim(),
       });
-      setMoveForm({ itemId:"", movementType:"in", quantity:"", rate:"", movementDate: new Date().toISOString().slice(0,10), reference:"", notes:"" });
+      setMoveForm({
+        itemId: "", reasonType: "adjustment_in", quantity: "", unitCost: "",
+        movementDate: TODAY(), reference: "", notes: "",
+      });
       setShowMoveForm(false);
       await load();
-      if (selectedItem?.id === moveForm.itemId) await loadMovements(selectedItem);
-    } catch(e) { setErr(e.message); }
+      if (selectedItem) {
+        const refreshed = items.find((i) => i.id === selectedItem.id) || selectedItem;
+        await loadMovements(refreshed);
+      }
+    } catch (e) {
+      setErr(e.message);
+    }
     setBusy(false);
   };
 
-  const filtered = filter === "all" ? items
-    : filter === "low" ? items.filter(i => Number(i.current_stock) <= Number(i.reorder_level))
-    : items.filter(i => i.category === filter);
-
-  const categories = [...new Set(items.map(i => i.category))].filter(Boolean);
-  const lowStockCount = items.filter(i => Number(i.current_stock) <= Number(i.reorder_level)).length;
-  const totalItems = items.length;
-  const totalStockValue = items.reduce((s,i) => s + Number(i.current_stock) * Number(i.cost_price), 0);
+  const selectedReason = REASONS.find((r) => r.value === moveForm.reasonType);
+  const filtered = filter === "low" ? items.filter((i) => i.is_low_stock) : items;
+  const totalStockValue = useMemo(
+    () => items.reduce((s, i) => s + Number(i.inventory_value || 0), 0),
+    [items]
+  );
+  const lowStockCount = items.filter((i) => i.is_low_stock).length;
 
   return (
     <div className="panel">
       <div className="panel-head">
-        <h2>Inventory (स्टक)</h2>
-        <div style={{display:"flex",gap:8}}>
-          <button className="ghost-btn" onClick={() => { setShowMoveForm(s=>!s); setShowItemForm(false); }}>
-            {showMoveForm ? "Cancel" : "± Stock Movement"}
-          </button>
-          <button className="btn" onClick={() => { setShowItemForm(s=>!s); setShowMoveForm(false); }}>
-            {showItemForm ? "Cancel" : "+ New Item"}
-          </button>
-        </div>
-      </div>
-
-      {/* Stats */}
-      <div className="stat-row">
-        <div className="stat"><span>{totalItems}</span>Total Items</div>
-        <div className="stat"><span style={{color:lowStockCount>0?"var(--rust)":"var(--green2)"}}>{lowStockCount}</span>Low Stock</div>
-        <div className="stat"><span>NPR {totalStockValue.toLocaleString()}</span>Stock Value</div>
-      </div>
-
-      {/* Closing Stock — posts the stock value to the ledger as a Balance Sheet asset */}
-      <ClosingStockPanel totalStockValue={totalStockValue} onPosted={load} />
-
-      {lowStockCount > 0 && (
-        <div className="alert-bar">
-          ⚠ {lowStockCount} item{lowStockCount>1?"s":""} at or below reorder level.
-          <button className="link" style={{display:"inline",marginLeft:8}} onClick={()=>setFilter("low")}>View →</button>
-        </div>
-      )}
-
-      {/* New Item Form */}
-      {showItemForm && (
-        <form className="inv-form" onSubmit={submitItem}>
-          <b style={{marginBottom:8,display:"block"}}>New Inventory Item</b>
-          <div className="inv-form-top">
-            <label className="fld">Item Name <input placeholder="e.g. A4 Paper" value={itemForm.name} onChange={e=>setItemForm(f=>({...f,name:e.target.value}))} required /></label>
-            <label className="fld">Category <input placeholder="e.g. Stationery" value={itemForm.category} onChange={e=>setItemForm(f=>({...f,category:e.target.value}))} /></label>
-            <label className="fld">Unit <input placeholder="pcs / kg / ltr" value={itemForm.unit} onChange={e=>setItemForm(f=>({...f,unit:e.target.value}))} /></label>
-            <label className="fld">Cost Price <input type="number" step="0.01" placeholder="0" value={itemForm.cost_price} onChange={e=>setItemForm(f=>({...f,cost_price:e.target.value}))} /></label>
-            <label className="fld">Selling Price <input type="number" step="0.01" placeholder="0" value={itemForm.selling_price} onChange={e=>setItemForm(f=>({...f,selling_price:e.target.value}))} /></label>
-            <label className="fld">Reorder Level <input type="number" step="0.001" placeholder="0" value={itemForm.reorder_level} onChange={e=>setItemForm(f=>({...f,reorder_level:e.target.value}))} /></label>
-            <label className="fld wide-field">Description <input placeholder="Optional description" value={itemForm.description} onChange={e=>setItemForm(f=>({...f,description:e.target.value}))} /></label>
+        <div>
+          <h2>Inventory (स्टक)</h2>
+          <div className="muted" style={{ fontSize: 13 }}>
+            Quantity, weighted-average cost, stock value, COGS, and Inventory Asset are updated together in PostgreSQL.
           </div>
-          {err && <p className="msg err">{err}</p>}
-          <button className="btn" disabled={busy}>{busy?"Saving…":"Save Item"}</button>
-        </form>
-      )}
+        </div>
+        <button className="btn" onClick={() => setShowMoveForm((v) => !v)}>
+          {showMoveForm ? "Cancel" : "+ Stock Adjustment"}
+        </button>
+      </div>
 
-      {/* Stock Movement Form */}
+      <div className="stat-row">
+        <div className="stat"><span>{items.length}</span>Tracked Items</div>
+        <div className="stat"><span style={{ color: lowStockCount ? "var(--rust)" : "var(--green2)" }}>{lowStockCount}</span>Low Stock</div>
+        <div className="stat"><span>NPR {fmt(totalStockValue)}</span>Weighted-Average Value</div>
+      </div>
+
+      <ReconciliationPanel
+        stats={stats}
+        loading={reconLoading}
+        onRefresh={loadReconciliation}
+        onReconciled={load}
+      />
+
+      {err && <p className="msg err">{err}</p>}
+
       {showMoveForm && (
-        <form className="inv-form" onSubmit={submitMove}>
-          <b style={{marginBottom:8,display:"block"}}>Record Stock Movement</b>
+        <form className="inv-form" onSubmit={submitMovement}>
+          <b style={{ marginBottom: 8, display: "block" }}>Controlled Inventory Movement</b>
           <div className="inv-form-top">
             <label className="fld">Item
-              <select value={moveForm.itemId} onChange={e=>setMoveForm(f=>({...f,itemId:e.target.value}))} required>
+              <select value={moveForm.itemId} onChange={(e) => {
+                const item = items.find((i) => i.id === e.target.value);
+                setMoveForm((f) => ({
+                  ...f,
+                  itemId: e.target.value,
+                  unitCost: item ? String(Number(item.average_cost || item.purchase_price || 0)) : "",
+                }));
+              }} required>
                 <option value="">Select item…</option>
-                {items.map(i=><option key={i.id} value={i.id}>{i.name} (Stock: {i.current_stock} {i.unit})</option>)}
+                {items.map((i) => (
+                  <option key={i.id} value={i.id}>{i.name} (Stock: {fmt(i.current_stock, 3)} {i.unit})</option>
+                ))}
               </select>
             </label>
-            <label className="fld">Type
-              <select value={moveForm.movementType} onChange={e=>setMoveForm(f=>({...f,movementType:e.target.value}))}>
-                <option value="in">Stock In (Purchase / Return)</option>
-                <option value="out">Stock Out (Sale / Use)</option>
-                <option value="adjustment">Adjustment</option>
+            <label className="fld">Reason
+              <select value={moveForm.reasonType} onChange={(e) => setMoveForm((f) => ({ ...f, reasonType: e.target.value }))}>
+                {REASONS.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
               </select>
             </label>
-            <label className="fld">Quantity <input type="number" step="0.001" placeholder="0" value={moveForm.quantity} onChange={e=>setMoveForm(f=>({...f,quantity:e.target.value}))} required /></label>
-            <label className="fld">Rate/Unit <input type="number" step="0.01" placeholder="Cost per unit" value={moveForm.rate} onChange={e=>setMoveForm(f=>({...f,rate:e.target.value}))} /></label>
-            <label className="fld">Date <input type="date" value={moveForm.movementDate} onChange={e=>setMoveForm(f=>({...f,movementDate:e.target.value}))} /></label>
-            <label className="fld">Reference <input placeholder="Invoice # / Bill #" value={moveForm.reference} onChange={e=>setMoveForm(f=>({...f,reference:e.target.value}))} /></label>
-            <label className="fld wide-field">Notes <input placeholder="Optional notes" value={moveForm.notes} onChange={e=>setMoveForm(f=>({...f,notes:e.target.value}))} /></label>
+            <label className="fld">Quantity
+              <input type="number" min="0.001" step="0.001" value={moveForm.quantity}
+                     onChange={(e) => setMoveForm((f) => ({ ...f, quantity: e.target.value }))} required />
+            </label>
+            {selectedReason?.cost && (
+              <label className="fld">Inbound unit cost
+                <input type="number" min="0" step="0.01" value={moveForm.unitCost}
+                       onChange={(e) => setMoveForm((f) => ({ ...f, unitCost: e.target.value }))} />
+              </label>
+            )}
+            <label className="fld">Date
+              <input type="date" value={moveForm.movementDate}
+                     onChange={(e) => setMoveForm((f) => ({ ...f, movementDate: e.target.value }))} required />
+            </label>
+            <label className="fld">Reference
+              <input value={moveForm.reference} onChange={(e) => setMoveForm((f) => ({ ...f, reference: e.target.value }))}
+                     placeholder="Count sheet / reason" />
+            </label>
+            <label className="fld wide-field">Notes
+              <input value={moveForm.notes} onChange={(e) => setMoveForm((f) => ({ ...f, notes: e.target.value }))}
+                     placeholder="Supporting detail" />
+            </label>
           </div>
-          {err && <p className="msg err">{err}</p>}
-          <button className="btn" disabled={busy}>{busy?"Saving…":"Record Movement"}</button>
+          <p className="note">
+            Outgoing stock is valued at the current weighted-average cost. Every non-zero-value movement posts a balanced journal automatically.
+          </p>
+          <button className="btn" disabled={busy}>{busy ? "Posting…" : "Post Movement"}</button>
         </form>
       )}
 
-      {/* Filter */}
       <div className="filter-tabs">
-        <button className={"filter-tab"+(filter==="all"?" active":"")} onClick={()=>setFilter("all")}>All</button>
-        <button className={"filter-tab"+(filter==="low"?" active":"")} onClick={()=>setFilter("low")} style={{color:lowStockCount>0?"var(--rust)":""}}>
-          Low Stock {lowStockCount>0&&`(${lowStockCount})`}
-        </button>
-        {categories.map(c=>(
-          <button key={c} className={"filter-tab"+(filter===c?" active":"")} onClick={()=>setFilter(c)}>{c}</button>
-        ))}
+        <button className={`filter-tab${filter === "all" ? " active" : ""}`} onClick={() => setFilter("all")}>All</button>
+        <button className={`filter-tab${filter === "low" ? " active" : ""}`} onClick={() => setFilter("low")}>Low Stock ({lowStockCount})</button>
       </div>
 
-      {/* Items table */}
       {loading ? <p className="note">Loading…</p> : filtered.length === 0 ? (
-        <p className="note">No items found. Add your first inventory item above.</p>
+        <p className="note">No tracked inventory items. Create tracked goods from the Items page.</p>
       ) : (
-        <table className="tbl" style={{marginTop:8}}>
-          <thead>
-            <tr><th>Item</th><th>Category</th><th>Unit</th><th className="num">Stock</th><th className="num">Reorder</th><th className="num">Cost</th><th className="num">Selling</th><th className="num">Value</th><th/></tr>
-          </thead>
-          <tbody>
-            {filtered.map(i=>{
-              const isLow = Number(i.current_stock) <= Number(i.reorder_level);
-              return (
-                <tr key={i.id} className={isLow?"low-stock-row":""}>
-                  <td><b>{i.name}</b>{i.description&&<div className="muted" style={{fontSize:11}}>{i.description}</div>}</td>
-                  <td className="muted">{i.category}</td>
+        <div style={{ overflowX: "auto" }}>
+          <table className="tbl" style={{ marginTop: 8 }}>
+            <thead>
+              <tr>
+                <th>Item</th><th>Category</th><th>Unit</th>
+                <th className="num">Stock</th><th className="num">Avg Cost</th>
+                <th className="num">Value</th><th className="num">Reorder</th><th />
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map((i) => (
+                <tr key={i.id} className={i.is_low_stock ? "low-stock-row" : ""}>
+                  <td><b>{i.name}</b>{i.sku && <div className="muted" style={{ fontSize: 11 }}>{i.sku}</div>}</td>
+                  <td className="muted">{i.category_name || "—"}</td>
                   <td>{i.unit}</td>
-                  <td className={"num"+(isLow?" low-stock-val":"")}><b>{Number(i.current_stock).toLocaleString()}</b>{isLow&&<span className="tag tag-void">Low</span>}</td>
-                  <td className="num muted">{Number(i.reorder_level).toLocaleString()}</td>
-                  <td className="num">{Number(i.cost_price).toLocaleString()}</td>
-                  <td className="num">{Number(i.selling_price).toLocaleString()}</td>
-                  <td className="num">{(Number(i.current_stock)*Number(i.cost_price)).toLocaleString()}</td>
-                  <td><button className="link" onClick={()=>loadMovements(i)}>History</button></td>
+                  <td className={`num${i.is_low_stock ? " low-stock-val" : ""}`}><b>{fmt(i.current_stock, 3)}</b></td>
+                  <td className="num">{fmt(i.average_cost ?? i.purchase_price, 2)}</td>
+                  <td className="num"><b>{fmt(i.inventory_value)}</b></td>
+                  <td className="num muted">{fmt(i.reorder_level, 3)}</td>
+                  <td><button className="link" onClick={() => loadMovements(i)}>History</button></td>
                 </tr>
-              );
-            })}
-          </tbody>
-          <tfoot>
-            <tr>
-              <td colSpan={7} className="muted">Total stock value</td>
-              <td className="num"><b>NPR {totalStockValue.toLocaleString()}</b></td>
-              <td/>
-            </tr>
-          </tfoot>
-        </table>
+              ))}
+            </tbody>
+            <tfoot>
+              <tr><td colSpan={5} className="muted">Total inventory valuation</td><td className="num"><b>NPR {fmt(totalStockValue)}</b></td><td colSpan={2} /></tr>
+            </tfoot>
+          </table>
+        </div>
       )}
 
-      {/* Movement history panel */}
       {selectedItem && (
-        <div className="panel" style={{marginTop:16}}>
+        <div className="panel" style={{ marginTop: 16 }}>
           <div className="panel-head">
-            <h2>Stock History — {selectedItem.name}</h2>
-            <button className="link" onClick={()=>{setSelectedItem(null);setMovements([]);}}>✕ Close</button>
+            <h2>Valuation History — {selectedItem.name}</h2>
+            <button className="link" onClick={() => { setSelectedItem(null); setMovements([]); }}>✕ Close</button>
           </div>
-          <p className="note">Current stock: <b>{selectedItem.current_stock} {selectedItem.unit}</b></p>
           {movLoading ? <p className="note">Loading…</p> : movements.length === 0 ? (
-            <p className="note">No movements recorded yet.</p>
+            <p className="note">No movements recorded.</p>
           ) : (
-            <table className="tbl">
-              <thead><tr><th>Date</th><th>Type</th><th className="num">Qty</th><th className="num">Rate</th><th className="num">Value</th><th>Reference</th><th>Notes</th></tr></thead>
-              <tbody>
-                {movements.map(m=>(
-                  <tr key={m.id}>
-                    <td>{m.movement_date}</td>
-                    <td><span className={m.movement_type==="in"?"mov-in":m.movement_type==="out"?"mov-out":"mov-adj"}>{m.movement_type}</span></td>
-                    <td className="num">{m.movement_type==="out"?"-":""}{Number(m.quantity).toLocaleString()}</td>
-                    <td className="num">{Number(m.rate).toLocaleString()}</td>
-                    <td className="num">{(Number(m.quantity)*Number(m.rate)).toLocaleString()}</td>
-                    <td>{m.reference||"—"}</td>
-                    <td className="muted">{m.notes||"—"}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            <div style={{ overflowX: "auto" }}>
+              <table className="tbl">
+                <thead>
+                  <tr><th>Date</th><th>Source</th><th className="num">Qty Δ</th><th className="num">Unit Cost</th><th className="num">Cost</th><th className="num">Stock After</th><th className="num">Value After</th><th>Reference</th></tr>
+                </thead>
+                <tbody>
+                  {movements.map((m) => (
+                    <tr key={m.id}>
+                      <td>{m.movement_date}</td>
+                      <td><span className={Number(m.quantity_delta) >= 0 ? "mov-in" : "mov-out"}>{String(m.source_type || m.movement_type).replaceAll("_", " ")}</span>{m.is_legacy && <div className="muted" style={{ fontSize: 10 }}>legacy</div>}</td>
+                      <td className="num">{Number(m.quantity_delta || 0) > 0 ? "+" : ""}{fmt(m.quantity_delta, 3)}</td>
+                      <td className="num">{fmt(m.unit_cost ?? m.rate, 2)}</td>
+                      <td className="num">{fmt(m.total_cost ?? Number(m.quantity || 0) * Number(m.rate || 0), 2)}</td>
+                      <td className="num">{m.stock_after == null ? "—" : fmt(m.stock_after, 3)}</td>
+                      <td className="num">{m.value_after == null ? "—" : fmt(m.value_after, 2)}</td>
+                      <td>{m.reference || "—"}{m.notes && <div className="muted" style={{ fontSize: 11 }}>{m.notes}</div>}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           )}
         </div>
       )}

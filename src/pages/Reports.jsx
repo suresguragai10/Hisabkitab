@@ -268,7 +268,7 @@ function buildBS(balances) {
   const netProfit    = totalIncome - totalExpense;
 
   // Group assets: current vs non-current
-  const currentGroups = ["Cash-in-Hand","Bank Accounts","Sundry Debtors","Duties & Taxes","General"];
+  const currentGroups = ["Cash-in-Hand","Bank Accounts","Sundry Debtors","Duties & Taxes","Current Assets","Stock-in-Hand","General"];
   const currentAssets    = assets.filter(b =>  currentGroups.includes(b.account.group_name));
   const nonCurrentAssets = assets.filter(b => !currentGroups.includes(b.account.group_name));
 

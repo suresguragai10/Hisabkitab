@@ -7,7 +7,7 @@ import PaymentModal from "./PaymentModal";
 import { useBusinessProfile } from "../lib/businessProfile";
 
 const VAT_RATE = 13;
-const blankLine = () => ({ description: "", quantity: "1", unit: "pcs", rate: "", vatRate: VAT_RATE });
+const blankLine = () => ({ itemId: "", description: "", quantity: "1", unit: "pcs", rate: "", vatRate: VAT_RATE });
 
 // ── helpers ───────────────────────────────────────────────────
 function calcAmount(l) { return (parseFloat(l.quantity)||0) * (parseFloat(l.rate)||0); }
@@ -21,11 +21,11 @@ async function nextBillNumber(fiscalYear) {
 
 // NOTE: bill creation now goes through createBillWithPosting()
 // (see ../lib/posting.js), which inserts the bill AND its balanced
-// purchase voucher (Dr Purchase / Dr VAT Receivable / Cr Vendor) in
+// purchase voucher (Dr Inventory Asset or Purchase Expense / Dr VAT / Cr Vendor) in
 // one transaction. The old non-posting insert was removed.
 
 async function fetchItems() {
-  const { data } = await supabase.from("inventory_items").select("id,name,unit,cost_price,current_stock").eq("is_active",true).order("name");
+  const { data } = await supabase.from("inventory_items").select("id,name,unit,cost_price,average_cost,current_stock,hsn_code,track_inventory,item_type").eq("is_active",true).order("name");
   return data || [];
 }
 
@@ -175,6 +175,8 @@ export default function Purchases({ userId }) {
       const fiscalYear = currentFiscalYear();
       const billNumber = await nextBillNumber(fiscalYear);
       const postLines = validLines.map((l) => ({
+        item_id: l.itemId || null,
+        hsn_code: items.find((item) => item.id === l.itemId)?.hsn_code || null,
         description: l.description,
         quantity: parseFloat(l.quantity) || 1,
         unit: l.unit || "pcs",
@@ -266,7 +268,7 @@ export default function Purchases({ userId }) {
                     <select style={{width:"100%",marginBottom:3}} value={l.itemId||""}
                       onChange={e=>{
                         const itm = items.find(x=>x.id===e.target.value);
-                        if(itm) updateLine(i,{itemId:itm.id,description:itm.name,unit:itm.unit,rate:String(itm.cost_price)});
+                        if(itm) updateLine(i,{itemId:itm.id,description:itm.name,unit:itm.unit,rate:String(itm.average_cost || itm.cost_price)});
                         else updateLine(i,{itemId:"",description:"",unit:"pcs",rate:""});
                       }}>
                       <option value="">— type below or pick item —</option>

@@ -2,7 +2,7 @@
 // Phase P3 — Items page
 // The item master. Rich fields (SKU, HSN, brand, category,
 // default sales/purchase rates, preferred vendor, item type).
-// Old Inventory.jsx keeps stock-movement / closing-stock UI;
+// Inventory.jsx owns controlled stock adjustments and ledger reconciliation;
 // this page owns the item master and category picker.
 // ============================================================
 
@@ -272,7 +272,7 @@ export default function Items({ onChanged }) {
   }, [search]); // eslint-disable-line
 
   const totalStockValue = useMemo(
-    () => rows.reduce((s, r) => s + Number(r.current_stock || 0) * Number(r.purchase_price || 0), 0),
+    () => rows.reduce((s, r) => s + Number(r.inventory_value ?? Number(r.current_stock || 0) * Number(r.purchase_price || 0)), 0),
     [rows]
   );
 
@@ -395,7 +395,7 @@ export default function Items({ onChanged }) {
                 </td>
                 <td className="num">
                   <div>NPR {fmt(r.sales_price)} <span className="muted" style={{ fontSize: 11 }}>+{r.sales_tax_rate}%</span></div>
-                  <div className="muted" style={{ fontSize: 12 }}>Cost NPR {fmt(r.purchase_price)}</div>
+                  <div className="muted" style={{ fontSize: 12 }}>Avg. cost NPR {fmt(r.average_cost ?? r.purchase_price)}</div>
                 </td>
                 <td className="num">
                   {r.track_inventory ? (
