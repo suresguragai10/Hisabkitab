@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { supabase } from "../supabase";
+import { fiscalYearFor } from "../lib/fiscalYear";
 
 const fmt = (n) => Number(n||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2});
 
@@ -248,15 +249,53 @@ export default function SetupWizard({ onComplete }) {
   const saveBalances = async () => {
     setBusy(true); setErr(null);
     try {
-      const n = k => parseFloat(balForm[k])||0;
-      const { error } = await supabase.rpc("set_opening_balances", {
-        p_cash:      n("cash"),
-        p_bank:      n("bank"),
-        p_stock:     n("stock"),
-        p_debtors:   n("debtors"),
-        p_creditors: n("creditors"),
-      });
-      if (error) throw error;
+      const n = (key) => parseFloat(balForm[key]) || 0;
+      if (n("stock") > 0.005) {
+        throw new Error("Opening stock must be entered item-by-item from Inventory so quantity and value remain reconciled.");
+      }
+
+      const { error: seedError } = await supabase.rpc("seed_default_accounts");
+      if (seedError) throw seedError;
+      const { data: systemAccounts, error: accountError } = await supabase
+        .from("accounts")
+        .select("id,system_code,account_subtype")
+        .or("system_code.in.(cash,bank,ar_control,ap_control),account_subtype.eq.capital")
+        .eq("is_active", true);
+      if (accountError) throw accountError;
+
+      const byCode = Object.fromEntries((systemAccounts || []).filter((a) => a.system_code).map((a) => [a.system_code, a.id]));
+      const capitalId = systemAccounts?.find((a) => a.account_subtype === "capital")?.id;
+      const lines = [];
+      const addDebit = (accountId, amount, description) => {
+        if (amount > 0.005) lines.push({ account_id: accountId, debit: amount, credit: 0, description });
+      };
+      const addCredit = (accountId, amount, description) => {
+        if (amount > 0.005) lines.push({ account_id: accountId, debit: 0, credit: amount, description });
+      };
+      addDebit(byCode.cash, n("cash"), "Opening cash");
+      addDebit(byCode.bank, n("bank"), "Opening bank");
+      addDebit(byCode.ar_control, n("debtors"), "Opening receivables control");
+      addCredit(byCode.ap_control, n("creditors"), "Opening payables control");
+
+      const totalDebit = lines.reduce((sum, line) => sum + line.debit, 0);
+      const totalCredit = lines.reduce((sum, line) => sum + line.credit, 0);
+      const difference = Number((totalDebit - totalCredit).toFixed(2));
+      if (Math.abs(difference) > 0.005) {
+        if (!capitalId) throw new Error("Capital Account was not found.");
+        if (difference > 0) addCredit(capitalId, difference, "Opening capital");
+        else addDebit(capitalId, -difference, "Opening deficit");
+      }
+
+      if (lines.length > 0) {
+        const date = new Date().toISOString().slice(0, 10);
+        const { error } = await supabase.rpc("post_opening_journal", {
+          p_fiscal_year: fiscalYearFor(new Date()),
+          p_date: date,
+          p_lines: lines,
+          p_notes: "Opening balances entered during setup",
+        });
+        if (error) throw error;
+      }
       setStep(3);
     } catch(e) { setErr(e.message); }
     setBusy(false);

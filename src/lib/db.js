@@ -59,24 +59,41 @@ export async function listAccounts() {
     .from("accounts")
     .select("*")
     .eq("is_active", true)
-    .order("group_name", { ascending: true })
+    .order("account_code", { ascending: true })
     .order("name", { ascending: true });
   if (error) throw error;
   return data;
 }
 
-export async function createAccount(userId, account) {
-  const { data, error } = await supabase
-    .from("accounts")
-    .insert({ user_id: userId, ...account })
-    .select()
-    .single();
+export async function createAccount(_userId, account) {
+  if (Math.abs(Number(account.opening_balance || 0)) > 0.005) {
+    throw new Error("Create the account first, then use the balanced Opening Journal.");
+  }
+  const reportClass = account.report_class || (
+    account.account_type === "asset" ? "current_asset" :
+    account.account_type === "liability" ? "current_liability" :
+    account.account_type === "equity" ? "equity" :
+    account.account_type === "income" ? "other_income" : "operating_expense"
+  );
+  const { data, error } = await supabase.rpc("create_structured_account", {
+    p_name: account.name,
+    p_account_code: account.account_code || null,
+    p_account_type: account.account_type,
+    p_report_class: reportClass,
+    p_account_subtype: account.account_subtype || "general",
+    p_normal_balance: account.normal_balance || account.opening_balance_type || null,
+    p_parent_account_id: account.parent_account_id || null,
+    p_cash_flow_category: account.cash_flow_category || "operating",
+    p_allow_manual_posting: account.allow_manual_posting !== false,
+  });
   if (error) throw error;
-  return data;
+  const { data: created, error: readError } = await supabase.from("accounts").select("*").eq("id", data).single();
+  if (readError) throw readError;
+  return created;
 }
 
 export async function deactivateAccount(id) {
-  const { error } = await supabase.from("accounts").update({ is_active: false }).eq("id", id);
+  const { error } = await supabase.rpc("deactivate_structured_account", { p_id: id });
   if (error) throw error;
 }
 
@@ -93,34 +110,36 @@ export async function listParties() {
   return data;
 }
 
-export async function createParty(userId, { name, partyType, phone, email, address, panVat, openingBalance, openingBalanceType }) {
-  // A party is backed by its own ledger account under Sundry Debtors/Creditors.
-  const groupName = partyType === "vendor" ? "Sundry Creditors" : "Sundry Debtors";
-  const accountType = partyType === "vendor" ? "liability" : "asset";
-
-  const account = await createAccount(userId, {
-    name,
-    account_type: accountType,
-    group_name: groupName,
-    is_party_account: true,
-    opening_balance: openingBalance || 0,
-    opening_balance_type: openingBalanceType || "debit",
+export async function createParty(_userId, { name, partyType, phone, email, address, panVat, openingBalance }) {
+  if (Math.abs(Number(openingBalance || 0)) > 0.005) {
+    throw new Error("Create the party first, then use Chart of Accounts > Opening Journal.");
+  }
+  const { data: partyId, error } = await supabase.rpc("create_contact", {
+    p_name: name,
+    p_name_np: null,
+    p_is_customer: partyType === "customer" || partyType === "both",
+    p_is_vendor: partyType === "vendor" || partyType === "both",
+    p_contact_person: null,
+    p_phone: phone || null,
+    p_email: email || null,
+    p_billing_address: address || null,
+    p_shipping_address: null,
+    p_pan_number: panVat || null,
+    p_vat_number: null,
+    p_payment_terms_days: null,
+    p_tds_applicable: false,
+    p_tds_rate: null,
+    p_notes: null,
+    p_opening_balance: 0,
+    p_opening_balance_type: "debit",
   });
-
-  const { data, error } = await supabase
-    .from("parties")
-    .insert({
-      user_id: userId,
-      account_id: account.id,
-      party_type: partyType,
-      phone: phone || null,
-      email: email || null,
-      address: address || null,
-      pan_vat_number: panVat || null,
-    })
-    .select("*, accounts(id, name, opening_balance, opening_balance_type)")
-    .single();
   if (error) throw error;
+  const { data, error: readError } = await supabase
+    .from("parties")
+    .select("*, accounts(id, name, account_code, opening_balance, opening_balance_type)")
+    .eq("id", partyId)
+    .single();
+  if (readError) throw readError;
   return data;
 }
 

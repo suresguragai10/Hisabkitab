@@ -4,7 +4,7 @@ HisabKitab is a React 18, Vite, Supabase, and PostgreSQL accounting prototype fo
 
 ## Product status
 
-Version **6.3.0** contains the source implementation through Stage 4 of the remediation plan. It remains a **development prototype** and is not approved for production bookkeeping or statutory reliance. Complete staging migration, acceptance, reconciliation, role/RLS, report, tax, backup, and professional accounting review gates before using real business data.
+Version **6.4.0** contains the source implementation through Stage 5 of the remediation plan. It remains a **development prototype** and is not approved for production bookkeeping or statutory reliance. Complete staging migration, acceptance, reconciliation, role/RLS, report, tax, backup, and professional accounting review gates before using real business data.
 
 Review these files before deployment:
 
@@ -13,6 +13,7 @@ Review these files before deployment:
 - `STAGE2_IMPLEMENTATION_NOTES.md` — payment allocations
 - `STAGE3_IMPLEMENTATION_NOTES.md` — perpetual inventory and COGS
 - `STAGE4_IMPLEMENTATION_NOTES.md` — document lifecycle, reversals, and notes
+- `STAGE5_IMPLEMENTATION_NOTES.md` — structured Chart of Accounts and opening journals
 
 ## Implemented remediation stages
 
@@ -47,17 +48,27 @@ Review these files before deployment:
 - Sales credit notes and purchase debit notes with VAT, party, stock, and COGS posting
 - Private document attachments and internal notes
 
+
+### Stage 5 — structured Chart of Accounts
+
+- Stable account codes and parent-child hierarchy
+- Report classes, account subtypes, normal balances, and cash-flow categories
+- Protected system and control accounts
+- Controlled create, update, and deactivation RPCs
+- Balanced opening journals and legacy-opening conversion
+- P&L, Balance Sheet, Trial Balance, dashboard, bank, and voucher selection based on structured fields
+
 ## Database application order
 
 Use a separate staging Supabase project and create a backup first. Apply the accepted baseline migrations in their documented order. For the latest changes, run:
 
 ```text
-sql/phaseP0_4_document_lifecycle_preflight.sql
-sql/phaseP0_4_document_lifecycle.sql
-sql/phaseP0_4_document_lifecycle_verify.sql
+sql/phaseP0_5_structured_chart_preflight.sql
+sql/phaseP0_5_structured_chart.sql
+sql/phaseP0_5_structured_chart_verify.sql
 ```
 
-Every preflight result labelled missing, duplicate, or blocking should be resolved before the main migration. Review every verification result and complete the acceptance tests in `STAGE4_IMPLEMENTATION_NOTES.md` before production scheduling.
+Every preflight result labelled missing, duplicate, or blocking should be resolved before the main migration. Review every verification result and complete the acceptance tests in `STAGE5_IMPLEMENTATION_NOTES.md` before production scheduling.
 
 ## Run locally
 
@@ -84,4 +95,4 @@ Use separate development, staging, and production projects. Do not apply migrati
 
 ## Next priority
 
-After Stage 4 is migrated and accepted in staging, proceed to **Stage 5: structured Chart of Accounts**. Reports must stop depending on account display-name strings.
+After Stage 5 is migrated and accepted in staging, proceed to **Stage 6: trustworthy reports**, beginning with General Ledger, Day Book, Trial Balance, Profit & Loss, and Balance Sheet reconciliation.

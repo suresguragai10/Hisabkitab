@@ -7,8 +7,8 @@ const fmtD = (d) => d ? new Date(d).toLocaleDateString("en-NP") : "—";
 
 // ── DB helpers ────────────────────────────────────────────────
 async function fetchBankAccounts() {
-  const { data } = await supabase.from("accounts").select("id,name,group_name")
-    .in("group_name",["Bank Accounts","Cash-in-Hand"]).eq("is_active",true).order("name");
+  const { data } = await supabase.from("accounts").select("id,name,account_code,account_subtype")
+    .in("account_subtype",["bank","cash"]).eq("is_active",true).order("account_code");
   return data || [];
 }
 

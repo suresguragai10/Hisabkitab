@@ -51,7 +51,7 @@ export default function VoucherEntry({ userId, onSaved, lang = "en" }) {
       try {
         const data = await listAccounts();
         if (active) {
-          setAccounts(data);
+          setAccounts(data.filter((account) => account.allow_manual_posting !== false));
           setError(null);
         }
       } catch (err) {
@@ -66,7 +66,7 @@ export default function VoucherEntry({ userId, onSaved, lang = "en" }) {
 
   const groupedAccounts = useMemo(() => {
     return accounts.reduce((groups, account) => {
-      const group = account.group_name || "General";
+      const group = account.report_class ? account.report_class.replaceAll("_", " ") : (account.group_name || "General");
       if (!groups[group]) groups[group] = [];
       groups[group].push(account);
       return groups;
@@ -241,7 +241,7 @@ export default function VoucherEntry({ userId, onSaved, lang = "en" }) {
                       {Object.entries(groupedAccounts).map(([group, groupAccounts]) => (
                         <optgroup key={group} label={group}>
                           {groupAccounts.map((account) => (
-                            <option key={account.id} value={account.id}>{account.name}</option>
+                            <option key={account.id} value={account.id}>{account.account_code ? `${account.account_code} · ${account.name}` : account.name}</option>
                           ))}
                         </optgroup>
                       ))}

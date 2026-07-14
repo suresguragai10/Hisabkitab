@@ -454,19 +454,22 @@ returns trigger
 language plpgsql
 set search_path = public
 as $$
+declare
+  v_new jsonb := to_jsonb(new);
+  v_old jsonb := to_jsonb(old);
 begin
-  if new.user_id is distinct from old.user_id
-     or new.fiscal_year is distinct from old.fiscal_year then
+  if v_new->>'user_id' is distinct from v_old->>'user_id'
+     or v_new->>'fiscal_year' is distinct from v_old->>'fiscal_year' then
     raise exception 'Document owner and fiscal year are immutable.';
   end if;
 
-  if tg_table_name = 'invoices' and new.invoice_number is distinct from old.invoice_number then
+  if tg_table_name = 'invoices' and v_new->>'invoice_number' is distinct from v_old->>'invoice_number' then
     raise exception 'Invoice number is immutable.';
-  elsif tg_table_name = 'purchase_bills' and new.bill_number is distinct from old.bill_number then
+  elsif tg_table_name = 'purchase_bills' and v_new->>'bill_number' is distinct from v_old->>'bill_number' then
     raise exception 'Bill number is immutable.';
-  elsif tg_table_name = 'credit_notes' and new.cn_number is distinct from old.cn_number then
+  elsif tg_table_name = 'credit_notes' and v_new->>'cn_number' is distinct from v_old->>'cn_number' then
     raise exception 'Credit note number is immutable.';
-  elsif tg_table_name = 'debit_notes' and new.dn_number is distinct from old.dn_number then
+  elsif tg_table_name = 'debit_notes' and v_new->>'dn_number' is distinct from v_old->>'dn_number' then
     raise exception 'Debit note number is immutable.';
   end if;
   return new;

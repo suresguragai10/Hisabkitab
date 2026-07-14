@@ -25,7 +25,7 @@ export default function Ledger() {
       <label className="fld wide-field">Account
         <select value={accountId} onChange={(e) => setAccountId(e.target.value)}>
           <option value="">Select an account…</option>
-          {accounts.map((a) => <option key={a.id} value={a.id}>{a.name} ({a.group_name})</option>)}
+          {accounts.map((a) => <option key={a.id} value={a.id}>{a.account_code ? `${a.account_code} · ${a.name}` : a.name}</option>)}
         </select>
       </label>
 

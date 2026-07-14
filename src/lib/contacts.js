@@ -57,8 +57,8 @@ export async function createContact(fields) {
     p_tds_applicable:       !!fields.tdsApplicable,
     p_tds_rate:             fields.tdsRate ?? null,
     p_notes:                fields.notes || null,
-    p_opening_balance:      Number(fields.openingBalance) || 0,
-    p_opening_balance_type: fields.openingBalanceType || "debit",
+    p_opening_balance:      0,
+    p_opening_balance_type: "debit",
   });
   if (error) throw error;
   return data; // new contact id

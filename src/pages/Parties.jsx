@@ -9,7 +9,7 @@ export default function Parties({ userId, onChanged }) {
   const [busy, setBusy] = useState(false);
   const [form, setForm] = useState({
     name: "", partyType: "customer", phone: "", email: "", address: "",
-    panVat: "", openingBalance: "0", openingBalanceType: "debit",
+    panVat: "",
   });
 
   const load = async () => {
@@ -37,10 +37,9 @@ export default function Parties({ userId, onChanged }) {
         email: form.email.trim(),
         address: form.address.trim(),
         panVat: form.panVat.trim(),
-        openingBalance: parseFloat(form.openingBalance) || 0,
-        openingBalanceType: form.openingBalanceType,
+        openingBalance: 0,
       });
-      setForm({ name: "", partyType: "customer", phone: "", email: "", address: "", panVat: "", openingBalance: "0", openingBalanceType: "debit" });
+      setForm({ name: "", partyType: "customer", phone: "", email: "", address: "", panVat: "" });
       setShowForm(false);
       await load();
       onChanged && onChanged();
@@ -71,12 +70,7 @@ export default function Parties({ userId, onChanged }) {
           <input placeholder="Email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
           <input placeholder="PAN / VAT number" value={form.panVat} onChange={(e) => setForm({ ...form, panVat: e.target.value })} />
           <input placeholder="Address" value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} className="wide-field" />
-          <input type="number" step="0.01" placeholder="Opening balance" value={form.openingBalance}
-            onChange={(e) => setForm({ ...form, openingBalance: e.target.value })} />
-          <select value={form.openingBalanceType} onChange={(e) => setForm({ ...form, openingBalanceType: e.target.value })}>
-            <option value="debit">They owe you (Dr)</option>
-            <option value="credit">You owe them (Cr)</option>
-          </select>
+          <p className="note wide-field">Post starting receivables or payables through Chart of Accounts → Opening Journal after saving the party.</p>
           <button className="btn" disabled={busy}>{busy ? "Saving…" : "Save Party"}</button>
         </form>
       )}

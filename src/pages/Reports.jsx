@@ -176,12 +176,13 @@ function TBView({ data }) {
       </div>
 
       <table className="tbl">
-        <thead><tr><th>Account</th><th>Group</th><th className="num">Debit</th><th className="num">Credit</th></tr></thead>
+        <thead><tr><th>Code</th><th>Account</th><th>Report class</th><th className="num">Debit</th><th className="num">Credit</th></tr></thead>
         <tbody>
           {rows.map(r=>(
             <tr key={r.account_id}>
+              <td>{r.account_code}</td>
               <td>{r.name}</td>
-              <td className="muted">{r.group_name}</td>
+              <td className="muted">{String(r.report_class || r.group_name).replaceAll("_", " ")}</td>
               <td className="num">{Number(r.debit) ? fmt(Number(r.debit)) : ""}</td>
               <td className="num">{Number(r.credit) ? fmt(Number(r.credit)) : ""}</td>
             </tr>
@@ -189,7 +190,7 @@ function TBView({ data }) {
         </tbody>
         <tfoot>
           <tr>
-            <td colSpan={2}><b>Total</b></td>
+            <td colSpan={3}><b>Total</b></td>
             <td className="num"><b>{fmt(totalDebit)}</b></td>
             <td className="num"><b>{fmt(totalCredit)}</b></td>
           </tr>
@@ -201,9 +202,9 @@ function TBView({ data }) {
 
 // ── P&L ──────────────────────────────────────────────────────
 function buildPL(balances, from, to) {
-  const income = balances.filter(b => b.account.account_type === "income");
-  const expense = balances.filter(b => b.account.account_type === "expense");
-  const totalIncome = income.reduce((s,b) => s + (-b.balance), 0); // income = credit balance
+  const income = balances.filter(b => ["revenue", "other_income"].includes(b.account.report_class));
+  const expense = balances.filter(b => ["cost_of_sales", "operating_expense", "other_expense"].includes(b.account.report_class));
+  const totalIncome = income.reduce((s,b) => s + (-b.balance), 0);
   const totalExpense = expense.reduce((s,b) => s + b.balance, 0);
   return { income, expense, totalIncome, totalExpense, netProfit: totalIncome - totalExpense };
 }
@@ -221,7 +222,7 @@ function PLView({ data, fromDate, toDate }) {
           <tbody>
             {data.income.map(b=>(
               <tr key={b.account.id}>
-                <td>{b.account.name}</td>
+                <td>{b.account.account_code} · {b.account.name}<span className="bs-grp">{b.account.report_class?.replaceAll("_", " ")}</span></td>
                 <td className="num">{fmt(-b.balance)}</td>
               </tr>
             ))}
@@ -236,7 +237,7 @@ function PLView({ data, fromDate, toDate }) {
           <tbody>
             {data.expense.map(b=>(
               <tr key={b.account.id}>
-                <td>{b.account.name}</td>
+                <td>{b.account.account_code} · {b.account.name}<span className="bs-grp">{b.account.report_class?.replaceAll("_", " ")}</span></td>
                 <td className="num">{fmt(b.balance)}</td>
               </tr>
             ))}
@@ -256,26 +257,20 @@ function PLView({ data, fromDate, toDate }) {
 // ── Balance Sheet ─────────────────────────────────────────────
 function buildBS(balances) {
   const safe = balances.filter(b => b && b.account);
-  const assets      = safe.filter(b => b.account.account_type === "asset");
-  const liabilities = safe.filter(b => b.account.account_type === "liability");
-  const equity      = safe.filter(b => b.account.account_type === "equity");
-  const income      = safe.filter(b => b.account.account_type === "income");
-  const expense     = safe.filter(b => b.account.account_type === "expense");
+  const currentAssets = safe.filter(b => b.account.report_class === "current_asset");
+  const nonCurrentAssets = safe.filter(b => b.account.report_class === "non_current_asset");
+  const currentLiab = safe.filter(b => b.account.report_class === "current_liability");
+  const longTermLiab = safe.filter(b => b.account.report_class === "non_current_liability");
+  const assets = [...currentAssets, ...nonCurrentAssets];
+  const liabilities = [...currentLiab, ...longTermLiab];
+  const equity = safe.filter(b => b.account.report_class === "equity");
+  const income = safe.filter(b => ["revenue", "other_income"].includes(b.account.report_class));
+  const expense = safe.filter(b => ["cost_of_sales", "operating_expense", "other_expense"].includes(b.account.report_class));
 
-  // Net profit = total income − total expenses (folded into equity on BS)
+  // Net profit = structured income less structured expenses.
   const totalIncome  = income.reduce((s,b) => s + (-b.balance), 0);
   const totalExpense = expense.reduce((s,b) => s + b.balance, 0);
   const netProfit    = totalIncome - totalExpense;
-
-  // Group assets: current vs non-current
-  const currentGroups = ["Cash-in-Hand","Bank Accounts","Sundry Debtors","Duties & Taxes","Current Assets","Stock-in-Hand","General"];
-  const currentAssets    = assets.filter(b =>  currentGroups.includes(b.account.group_name));
-  const nonCurrentAssets = assets.filter(b => !currentGroups.includes(b.account.group_name));
-
-  // Group liabilities: current vs long-term
-  const currentLiabGroups = ["Duties & Taxes","Sundry Creditors","General"];
-  const currentLiab    = liabilities.filter(b =>  currentLiabGroups.includes(b.account.group_name));
-  const longTermLiab   = liabilities.filter(b => !currentLiabGroups.includes(b.account.group_name));
 
   const totalAssets      = assets.reduce((s,b) => s + b.balance, 0);
   const totalLiabilities = liabilities.reduce((s,b) => s + (-b.balance), 0);
@@ -319,8 +314,8 @@ function BSView({ data }) {
         <div className="msg err" style={{marginBottom:16}}>
           <b>⚠ Out of balance by NPR {fmt(Math.abs(totalAssets - totalLiabilities - totalEquity))}</b>
           <div style={{marginTop:6,fontSize:12}}>
-            Most likely cause: an opening bank/cash balance was entered without a matching Capital Account entry.
-            Fix: go to <b>Chart of Accounts → Capital Account → edit → set opening balance</b> equal to your starting capital (credit).
+            Most likely cause: an incomplete legacy opening balance or an unbalanced migration.
+            Fix: use <b>Chart of Accounts → Opening Journal</b> and post a balanced debit/credit entry.
           </div>
         </div>
       )}
@@ -358,7 +353,7 @@ function BSView({ data }) {
             <div className="bs-sub-hd" style={{marginTop:16}}>Non-Current Liabilities</div>
             {longTermLiab.map(b=>(
               <div key={b.account.id} className="bs-row">
-                <span>{b.account.name}<span className="bs-grp">{b.account.group_name}</span></span>
+                <span>{b.account.account_code} · {b.account.name}<span className="bs-grp">{b.account.report_class?.replaceAll("_", " ")}</span></span>
                 <span className="bs-amt">{fmt(-b.balance)}</span>
               </div>
             ))}
@@ -374,7 +369,7 @@ function BSView({ data }) {
             ? <div className="bs-row muted"><span>—</span><span className="bs-amt">0.00</span></div>
             : currentLiab.map(b=>(
               <div key={b.account.id} className="bs-row">
-                <span>{b.account.name}<span className="bs-grp">{b.account.group_name}</span></span>
+                <span>{b.account.account_code} · {b.account.name}<span className="bs-grp">{b.account.report_class?.replaceAll("_", " ")}</span></span>
                 <span className="bs-amt">{fmt(-b.balance)}</span>
               </div>
             ))
@@ -399,7 +394,7 @@ function BSView({ data }) {
             <div className="bs-sub-hd">Non-Current Assets</div>
             {nonCurrentAssets.map(b=>(
               <div key={b.account.id} className="bs-row">
-                <span>{b.account.name}<span className="bs-grp">{b.account.group_name}</span></span>
+                <span>{b.account.account_code} · {b.account.name}<span className="bs-grp">{b.account.report_class?.replaceAll("_", " ")}</span></span>
                 <span className="bs-amt">{fmt(b.balance)}</span>
               </div>
             ))}
@@ -415,7 +410,7 @@ function BSView({ data }) {
             ? <div className="bs-row muted"><span>—</span><span className="bs-amt">0.00</span></div>
             : currentAssets.map(b=>(
               <div key={b.account.id} className="bs-row">
-                <span>{b.account.name}<span className="bs-grp">{b.account.group_name}</span></span>
+                <span>{b.account.account_code} · {b.account.name}<span className="bs-grp">{b.account.report_class?.replaceAll("_", " ")}</span></span>
                 <span className="bs-amt">{fmt(b.balance)}</span>
               </div>
             ))

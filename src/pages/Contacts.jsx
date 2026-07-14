@@ -74,8 +74,6 @@ const BLANK_FORM = {
   tdsApplicable: false,
   tdsRate: "",
   notes: "",
-  openingBalance: "0",
-  openingBalanceType: "debit",
 };
 
 function ContactFormModal({ initial, onSave, onCancel, busy, err }) {
@@ -89,7 +87,6 @@ function ContactFormModal({ initial, onSave, onCancel, busy, err }) {
       ...f,
       paymentTermsDays: f.paymentTermsDays ? Number(f.paymentTermsDays) : null,
       tdsRate: f.tdsRate ? Number(f.tdsRate) : null,
-      openingBalance: Number(f.openingBalance) || 0,
     });
   };
 
@@ -179,20 +176,10 @@ function ContactFormModal({ initial, onSave, onCancel, busy, err }) {
           </div>
 
           {!initial?.id && (
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10,
-                          borderTop: "1px solid #eee", paddingTop: 12 }}>
-              <label className="fld">Opening balance
-                <input type="number" step="0.01" value={f.openingBalance}
-                       onChange={(e) => set("openingBalance", e.target.value)} />
-              </label>
-              <label className="fld">Type
-                <select value={f.openingBalanceType}
-                        onChange={(e) => set("openingBalanceType", e.target.value)}>
-                  <option value="debit">They owe you (Dr)</option>
-                  <option value="credit">You owe them (Cr)</option>
-                </select>
-              </label>
-            </div>
+            <p className="note" style={{ borderTop: "1px solid #eee", paddingTop: 12 }}>
+              Create the contact first. Any starting receivable or payable must be posted through
+              <b> Chart of Accounts → Opening Journal</b> so the books remain balanced.
+            </p>
           )}
 
           <label className="fld">Notes

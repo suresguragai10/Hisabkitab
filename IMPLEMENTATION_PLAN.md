@@ -76,7 +76,7 @@ Status: **implemented in v6.2.0; owner applied the migration and pushed the repo
 
 ## Stage 4 — Rebuild document lifecycle
 
-Status: **implemented in v6.3.0 source; staging migration and acceptance are pending**
+Status: **implemented in v6.3.0; owner applied the migration and pushed the repository**
 
 1. Separate Draft, Posted, Cancelled, and Credited documents.
 2. Prohibit editing a posted financial document directly.
@@ -87,6 +87,8 @@ Status: **implemented in v6.3.0 source; staging migration and acceptance are pen
 7. Add document attachments and internal notes.
 
 ## Stage 5 — Structured Chart of Accounts
+
+Status: **implemented in v6.4.0 source; staging migration and acceptance are pending**
 
 1. Add account code, parent account, report class, account subtype, and normal balance.
 2. Mark system accounts and control accounts.
@@ -153,4 +155,4 @@ Every report should support date range, fiscal year, export, drill-down, and tot
 
 ## Immediate next development task
 
-First apply and accept the Stage 4 migration in staging using its preflight, verification, and lifecycle/return tests. After Stage 4 acceptance, implement **Stage 5: structured Chart of Accounts** so financial statements use stable report classifications rather than account-name text.
+Apply and accept the Stage 5 migration in staging using its preflight, verification, account-structure, opening-journal, and report-classification tests. After Stage 5 acceptance, proceed to **Stage 6: trustworthy reports** in the documented order.
