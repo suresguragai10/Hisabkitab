@@ -1,98 +1,70 @@
 # HisabKitab
 
-HisabKitab is a React 18, Vite, Supabase, and PostgreSQL accounting prototype for Nepal-focused businesses. It includes invoicing, purchases, inventory, double-entry vouchers, ledgers, reports, tax-related screens, team features, and Bikram Sambat date support.
+HisabKitab is a React, Vite, Supabase, and PostgreSQL accounting prototype for Nepal-focused businesses.
 
-## Product status
+## Current release
 
-Version **6.4.0** contains the source implementation through Stage 5 of the remediation plan. It remains a **development prototype** and is not approved for production bookkeeping or statutory reliance. Complete staging migration, acceptance, reconciliation, role/RLS, report, tax, backup, and professional accounting review gates before using real business data.
+Version **6.5.0** includes remediation Stages 1–6:
 
-Review these files before deployment:
+- safe manual double-entry vouchers;
+- payment allocations and partial-payment status;
+- perpetual moving-weighted-average inventory and COGS;
+- controlled document lifecycle, reversals, credit notes, and debit notes;
+- structured Chart of Accounts and balanced opening journals;
+- database-generated, ledger-reconciled financial and operational reports.
 
-- `IMPLEMENTATION_PLAN.md` — ordered release plan
-- `PRODUCT_AUDIT.md` — accounting, security, UI, and technical audit
-- `STAGE2_IMPLEMENTATION_NOTES.md` — payment allocations
-- `STAGE3_IMPLEMENTATION_NOTES.md` — perpetual inventory and COGS
-- `STAGE4_IMPLEMENTATION_NOTES.md` — document lifecycle, reversals, and notes
-- `STAGE5_IMPLEMENTATION_NOTES.md` — structured Chart of Accounts and opening journals
+The application remains a controlled development prototype and is not approved for production bookkeeping or statutory reliance. Complete the remaining tax, fiscal-period, security, testing, backup, and professional-review gates in `IMPLEMENTATION_PLAN.md`.
 
-## Implemented remediation stages
+## Stage 6 reports
 
-### Stage 1 — manual vouchers
+- General Ledger
+- Day Book
+- Trial Balance
+- Profit & Loss
+- Balance Sheet
+- Cash Flow
+- Receivables Ageing
+- Payables Ageing
+- Sales Register
+- Purchase Register
+- VAT Report
+- Stock Valuation
 
-- Journal, Payment, Receipt, and Contra entry
-- Multi-line balanced posting in one PostgreSQL transaction
-- Account ownership checks and safer numbering
-- Controlled voiding of manual vouchers
+Reports support date/as-of selection, fiscal-year filtering where applicable, print, CSV export, and account drill-down. Reconciliation differences are shown rather than hidden.
 
-### Stage 2 — payment allocations
+## Database migration
 
-- Separate payments and document allocations
-- Open, Partial, Paid, and Overdue balances derived from allocations
-- Over-allocation prevention and controlled payment-allocation reversal
-- Payment history on invoices and bills
-
-### Stage 3 — inventory and COGS
-
-- Perpetual inventory with moving weighted-average cost
-- Inventory Asset and Cost of Goods Sold posting
-- Purchase, sale, opening stock, damage, and adjustment valuation
-- Stock valuation versus Inventory Asset reconciliation
-
-### Stage 4 — document lifecycle
-
-- Separate Draft, Posted, Cancelled, and Credited lifecycle states
-- Editable drafts and immutable posted invoice/bill identities
-- Controlled source-document and note cancellation vouchers
-- Source links and reversal links on generated vouchers
-- Immutable invoice, bill, credit-note, and debit-note numbering by fiscal year
-- Sales credit notes and purchase debit notes with VAT, party, stock, and COGS posting
-- Private document attachments and internal notes
-
-
-### Stage 5 — structured Chart of Accounts
-
-- Stable account codes and parent-child hierarchy
-- Report classes, account subtypes, normal balances, and cash-flow categories
-- Protected system and control accounts
-- Controlled create, update, and deactivation RPCs
-- Balanced opening journals and legacy-opening conversion
-- P&L, Balance Sheet, Trial Balance, dashboard, bank, and voucher selection based on structured fields
-
-## Database application order
-
-Use a separate staging Supabase project and create a backup first. Apply the accepted baseline migrations in their documented order. For the latest changes, run:
+Use a staging Supabase project and take a backup first. Apply the migration chain in order. For Stage 6:
 
 ```text
-sql/phaseP0_5_structured_chart_preflight.sql
-sql/phaseP0_5_structured_chart.sql
-sql/phaseP0_5_structured_chart_verify.sql
+sql/phaseP0_6_trustworthy_reports_preflight.sql
+sql/phaseP0_6_trustworthy_reports.sql
+sql/phaseP0_6_trustworthy_reports_verify.sql
 ```
 
-Every preflight result labelled missing, duplicate, or blocking should be resolved before the main migration. Review every verification result and complete the acceptance tests in `STAGE5_IMPLEMENTATION_NOTES.md` before production scheduling.
+The repository also contains the corrected Stage 5 migration, including the null-safe control-account flag and credit/debit-note voucher types.
 
-## Run locally
+## Local development
 
 ```bash
 npm install
 npm run dev
 ```
 
-Vite normally prints `http://localhost:5173`.
-
-## Build
+## Production build
 
 ```bash
 npm run build
 ```
 
-The compiled application is written to `dist/`. The current build succeeds; Vite still warns that the main bundle is larger than 500 kB. Route-level code splitting remains a later UI/engineering task.
+Deploy the complete generated `dist` directory as one release. Do not mix `index.html` or asset files from different builds.
 
-## Configuration and security
+## Configuration and secrets
 
-Supabase browser configuration is in `src/config.js`. Use only the project URL and a browser-safe publishable/anon key. Never place a service-role key, database password, SMTP password, or deployment token in the frontend bundle.
+Supabase browser configuration is in `src/config.js`. The frontend must use only a browser-safe publishable/anon key. Never place a service-role key, database password, SMTP password, or deployment token in frontend source or Git.
 
-Use separate development, staging, and production projects. Do not apply migrations directly to production without a verified backup and rollback procedure.
+## Documentation
 
-## Next priority
-
-After Stage 5 is migrated and accepted in staging, proceed to **Stage 6: trustworthy reports**, beginning with General Ledger, Day Book, Trial Balance, Profit & Loss, and Balance Sheet reconciliation.
+- `IMPLEMENTATION_PLAN.md` — ordered remediation roadmap
+- `PRODUCT_AUDIT.md` — accounting, product, security, and UI audit
+- `STAGE6_IMPLEMENTATION_NOTES.md` — Stage 6 migration and acceptance procedure

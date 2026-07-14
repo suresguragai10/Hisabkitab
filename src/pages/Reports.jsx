@@ -1,604 +1,375 @@
-import React, { useEffect, useState, Component } from "react";
-import { supabase } from "../supabase";
-import { listTrialBalance } from "../lib/posting";
+import React, { Component, useEffect, useState } from "react";
+import {
+  downloadCsv,
+  getBalanceSheetReport,
+  getCashFlowReport,
+  getDayBookReport,
+  getGeneralLedgerReport,
+  getPayablesAgeingReport,
+  getProfitLossReport,
+  getPurchaseRegisterReport,
+  getReceivablesAgeingReport,
+  getReportFiscalYears,
+  getSalesRegisterReport,
+  getStockValuationReport,
+  getTrialBalanceReport,
+  getVatReport,
+} from "../lib/reports";
 
-// ── Error boundary — catches render crashes so one broken report 
-//   doesn't wipe the entire page. Shows the error message instead. ──
 class ReportBoundary extends Component {
-  constructor(props) { super(props); this.state = { err: null }; }
-  static getDerivedStateFromError(e) { return { err: e }; }
+  constructor(props) { super(props); this.state = { error: null }; }
+  static getDerivedStateFromError(error) { return { error }; }
   render() {
-    if (this.state.err) return (
-      <div className="msg err" style={{margin:"16px 0"}}>
-        <b>Report error:</b> {this.state.err.message}
-        <button className="link" style={{display:"inline",marginLeft:12}}
-          onClick={()=>this.setState({err:null})}>Try again</button>
-      </div>
-    );
-    return this.props.children;
+    if (!this.state.error) return this.props.children;
+    return <p className="msg err">Report error: {this.state.error.message}</p>;
   }
 }
 
-// ── DB helpers ────────────────────────────────────────────────
-async function fetchAccounts() {
-  const { data, error } = await supabase.from("accounts").select("*").eq("is_active", true);
-  if (error) throw error;
-  return data;
-}
+const REPORTS = [
+  ["daybook", "Day Book", "period"],
+  ["tb", "Trial Balance", "asof"],
+  ["pl", "Profit & Loss", "period"],
+  ["bs", "Balance Sheet", "asof"],
+  ["cashflow", "Cash Flow", "period"],
+  ["receivables", "Receivables Ageing", "asof"],
+  ["payables", "Payables Ageing", "asof"],
+  ["sales", "Sales Register", "period"],
+  ["purchases", "Purchase Register", "period"],
+  ["vat", "VAT Report", "period"],
+  ["stock", "Stock Valuation", "asof"],
+];
 
-async function fetchVoucherLines() {
-  const { data, error } = await supabase
-    .from("voucher_lines")
-    .select("*, vouchers(voucher_date, is_void, fiscal_year)");
-  if (error) throw error;
-  return data.filter(l => !l.vouchers?.is_void);
-}
+const money = (value) => Number(value || 0).toLocaleString(undefined, {
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+});
+const signedMoney = (value) => Number(value || 0) < 0 ? `(${money(Math.abs(Number(value)))})` : money(value);
+const titleCase = (value) => String(value || "").replaceAll("_", " ").replace(/\b\w/g, (c) => c.toUpperCase());
+const today = () => new Date().toISOString().slice(0, 10);
+const defaultFrom = () => {
+  const date = new Date();
+  date.setMonth(date.getMonth() - 6);
+  return date.toISOString().slice(0, 10);
+};
 
-async function fetchInvoices() {
-  const { data, error } = await supabase
-    .from("invoices")
-    .select("*")
-    .eq("document_status", "posted");
-  if (error) throw error;
-  return data;
-}
-
-async function fetchBills() {
-  const { data, error } = await supabase
-    .from("purchase_bills")
-    .select("*")
-    .eq("document_status", "posted");
-  if (error) throw error;
-  return data;
-}
-
-// ── number formatting ─────────────────────────────────────────
-const fmt = (n) => Math.abs(n).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-const fmtSign = (n) => (n < 0 ? "(" + fmt(n) + ")" : fmt(n));
-
-// ── compute ledger balances from voucher lines ────────────────
-function computeBalances(accounts, lines, fromDate, toDate) {
-  const balances = {};
-  accounts.forEach(a => {
-    const ob = a.opening_balance_type === "debit" ? Number(a.opening_balance) : -Number(a.opening_balance);
-    balances[a.id] = { account: a, balance: ob };
-  });
-  lines.forEach(l => {
-    const date = l.vouchers?.voucher_date;
-    if (fromDate && date < fromDate) return;
-    if (toDate && date > toDate) return;
-    if (balances[l.account_id]) {
-      balances[l.account_id].balance += Number(l.debit) - Number(l.credit);
-    }
-  });
-  return Object.values(balances);
-}
-
-// ── Reports page ──────────────────────────────────────────────
 export default function Reports() {
   const [report, setReport] = useState("pl");
-  const [fromDate, setFromDate] = useState(() => {
-    // Default to 2 years ago so all existing data is visible without manual adjustment
-    const d = new Date();
-    d.setFullYear(d.getFullYear() - 2);
-    return d.toISOString().slice(0,10);
-  });
-  const [toDate, setToDate] = useState(new Date().toISOString().slice(0,10));
+  const [fromDate, setFromDate] = useState(defaultFrom);
+  const [toDate, setToDate] = useState(today);
+  const [asOfDate, setAsOfDate] = useState(today);
+  const [fiscalYear, setFiscalYear] = useState("");
+  const [fiscalYears, setFiscalYears] = useState([]);
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [err, setErr] = useState(null);
+  const [error, setError] = useState(null);
+  const [drillAccount, setDrillAccount] = useState(null);
+
+  const mode = REPORTS.find(([key]) => key === report)?.[2] || "period";
+
+  useEffect(() => {
+    getReportFiscalYears().then((rows) => setFiscalYears(Array.isArray(rows) ? rows : [])).catch(() => {});
+  }, []);
 
   const run = async () => {
-    setLoading(true); setErr(null); setData(null);
+    setLoading(true);
+    setError(null);
     try {
-      const { error: refreshError } = await supabase.rpc("refresh_document_payment_statuses");
-      if (refreshError) throw refreshError;
-      const [accounts, lines, invoices, bills] = await Promise.all([
-        fetchAccounts(), fetchVoucherLines(), fetchInvoices(), fetchBills(),
-      ]);
-      // Period balances — for P&L and VAT (filtered to selected date range)
-      const balances = computeBalances(accounts, lines, fromDate, toDate);
-      // All-time balances — Balance Sheet always shows the full picture regardless of date filter
-      const balancesAll = computeBalances(accounts, lines, null, null);
-
-      if (report === "tb") setData({ rows: await listTrialBalance() });
-      else if (report === "pl") setData(buildPL(balances, fromDate, toDate));
-      else if (report === "bs") setData(buildBS(balancesAll));
-      else if (report === "vat") setData(buildVAT(invoices, bills, fromDate, toDate));
-      else if (report === "ageing") setData(buildAgeing(accounts, lines));
-      else if (report === "sales") setData(buildSales(invoices, fromDate, toDate));
-    } catch(e) { setErr(e.message); }
-    setLoading(false);
+      const period = { fromDate, toDate, fiscalYear: fiscalYear || null };
+      const asOf = { asOfDate };
+      const result = report === "daybook" ? await getDayBookReport(period)
+        : report === "tb" ? await getTrialBalanceReport(asOf)
+        : report === "pl" ? await getProfitLossReport(period)
+        : report === "bs" ? await getBalanceSheetReport(asOf)
+        : report === "cashflow" ? await getCashFlowReport(period)
+        : report === "receivables" ? await getReceivablesAgeingReport(asOf)
+        : report === "payables" ? await getPayablesAgeingReport(asOf)
+        : report === "sales" ? await getSalesRegisterReport(period)
+        : report === "purchases" ? await getPurchaseRegisterReport(period)
+        : report === "vat" ? await getVatReport(period)
+        : await getStockValuationReport(asOf);
+      setData(result);
+    } catch (err) {
+      setError(err.message || String(err));
+      setData(null);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  useEffect(() => { run(); }, [report, fromDate, toDate]);
+  useEffect(() => { run(); }, [report]);
+
+  const exportReport = () => {
+    const spec = csvSpec(report, data);
+    if (!spec) return;
+    const suffix = mode === "period" ? `${fromDate}-to-${toDate}` : `as-of-${asOfDate}`;
+    downloadCsv(`HisabKitab-${report}-${suffix}.csv`, spec.columns, spec.rows);
+  };
 
   return (
     <div className="panel">
       <div className="panel-head"><h2>Reports (रिपोर्ट)</h2></div>
 
-      {/* Report selector */}
-      <div className="filter-tabs" style={{marginBottom:16}}>
-        {[
-          {key:"tb", label:"Trial Balance"},
-          {key:"pl", label:"Profit & Loss"},
-          {key:"bs", label:"Balance Sheet"},
-          {key:"vat", label:"VAT Summary"},
-          {key:"ageing", label:"Ageing"},
-          {key:"sales", label:"Sales Report"},
-        ].map(r=>(
-          <button key={r.key} className={"filter-tab"+(report===r.key?" active":"")} onClick={()=>setReport(r.key)}>{r.label}</button>
+      <div className="filter-tabs" style={{ marginBottom: 16, flexWrap: "wrap" }}>
+        {REPORTS.map(([key, label]) => (
+          <button key={key} className={`filter-tab${report === key ? " active" : ""}`} onClick={() => setReport(key)}>{label}</button>
         ))}
       </div>
 
-      {/* Date range (not needed for BS and Ageing) */}
-      {report !== "bs" && report !== "ageing" && report !== "tb" && (
-        <div style={{display:"flex",gap:12,marginBottom:16,alignItems:"center",flexWrap:"wrap"}}>
-          <label className="fld" style={{margin:0,flex:"1 1 160px"}}>From <input type="date" value={fromDate} onChange={e=>setFromDate(e.target.value)} /></label>
-          <label className="fld" style={{margin:0,flex:"1 1 160px"}}>To <input type="date" value={toDate} onChange={e=>setToDate(e.target.value)} /></label>
-          <button className="btn" onClick={run} style={{marginTop:20}}>Run</button>
-        </div>
+      <div style={{ display: "flex", gap: 12, marginBottom: 16, alignItems: "end", flexWrap: "wrap" }}>
+        {mode === "period" ? <>
+          <label className="fld" style={{ margin: 0, minWidth: 160 }}>From
+            <input type="date" value={fromDate} onChange={(event) => setFromDate(event.target.value)} />
+          </label>
+          <label className="fld" style={{ margin: 0, minWidth: 160 }}>To
+            <input type="date" value={toDate} onChange={(event) => setToDate(event.target.value)} />
+          </label>
+          <label className="fld" style={{ margin: 0, minWidth: 150 }}>Fiscal year
+            <select value={fiscalYear} onChange={(event) => setFiscalYear(event.target.value)}>
+              <option value="">All fiscal years</option>
+              {fiscalYears.map((year) => <option key={year} value={year}>{year}</option>)}
+            </select>
+          </label>
+        </> : (
+          <label className="fld" style={{ margin: 0, minWidth: 180 }}>As of
+            <input type="date" value={asOfDate} onChange={(event) => setAsOfDate(event.target.value)} />
+          </label>
+        )}
+        <button className="btn" onClick={run} disabled={loading}>{loading ? "Running…" : "Run report"}</button>
+        <button className="ghost-btn" onClick={exportReport} disabled={!data}>Export CSV</button>
+        <button className="ghost-btn" onClick={() => window.print()} disabled={!data}>Print</button>
+      </div>
+
+      <p className="note" style={{ marginTop: 0 }}>
+        Posted, non-void ledger entries are the accounting source of truth. Click an account row to open its ledger detail.
+      </p>
+      {error && <p className="msg err">{error}</p>}
+      {loading && <p className="note">Computing report…</p>}
+      {data && !loading && (
+        <ReportBoundary key={`${report}-${fromDate}-${toDate}-${asOfDate}-${fiscalYear}`}>
+          <ReportView report={report} data={data} onDrill={setDrillAccount} />
+        </ReportBoundary>
       )}
 
-      {err && <p className="msg err">{err}</p>}
-      {loading && <p className="note">Computing…</p>}
-      {data && <ReportBoundary key={report}><ReportView report={report} data={data} fromDate={fromDate} toDate={toDate} /></ReportBoundary>}
+      {drillAccount && (
+        <LedgerDrilldown
+          account={drillAccount}
+          fromDate={mode === "period" ? fromDate : defaultFrom()}
+          toDate={mode === "period" ? toDate : asOfDate}
+          fiscalYear={mode === "period" ? fiscalYear : ""}
+          onClose={() => setDrillAccount(null)}
+        />
+      )}
     </div>
   );
 }
 
-// ── Report views ──────────────────────────────────────────────
-function ReportView({ report, data, fromDate, toDate }) {
-  if (report === "tb") return <TBView data={data} />;
-  if (report === "pl") return <PLView data={data} fromDate={fromDate} toDate={toDate} />;
-  if (report === "bs") return <BSView data={data} />;
-  if (report === "vat") return <VATView data={data} fromDate={fromDate} toDate={toDate} />;
-  if (report === "ageing") return <AgeingView data={data} />;
-  if (report === "sales") return <SalesView data={data} fromDate={fromDate} toDate={toDate} />;
-  return null;
+function ReportView({ report, data, onDrill }) {
+  if (report === "daybook") return <DayBook data={data} />;
+  if (report === "tb") return <TrialBalance data={data} onDrill={onDrill} />;
+  if (report === "pl") return <ProfitLoss data={data} onDrill={onDrill} />;
+  if (report === "bs") return <BalanceSheet data={data} onDrill={onDrill} />;
+  if (report === "cashflow") return <CashFlow data={data} />;
+  if (report === "receivables" || report === "payables") return <Ageing data={data} kind={report} />;
+  if (report === "sales" || report === "purchases") return <Register data={data} kind={report} />;
+  if (report === "vat") return <VatReport data={data} />;
+  return <StockValuation data={data} />;
 }
 
-// ── Trial Balance (integrity check: total debit must equal total credit) ──
-function TBView({ data }) {
+function StatusBanner({ good, goodText, badText, difference }) {
+  return (
+    <div className={`net-result ${good ? "profit" : "loss"}`} style={{ marginBottom: 16 }}>
+      <span>{good ? goodText : badText}</span>
+      {!good && difference !== undefined && <span>Difference: NPR {money(difference)}</span>}
+    </div>
+  );
+}
+
+function AccountButton({ row, onDrill }) {
+  return <button className="link" style={{ display: "inline", textAlign: "left" }} onClick={() => onDrill({ id: row.account_id, account_code: row.account_code, name: row.name })}>
+    {row.account_code ? `${row.account_code} · ` : ""}{row.name}
+  </button>;
+}
+
+function DayBook({ data }) {
+  return <div className="report-wrap">
+    <div className="report-title">Day Book</div>
+    <div className="report-period">{data.from} to {data.to}</div>
+    <StatusBanner good={Math.abs(Number(data.difference)) <= 0.005} goodText="Debits and credits reconcile" badText="Day Book is out of balance" difference={data.difference} />
+    {(data.rows || []).map((voucher) => <details key={voucher.voucher_id} style={{ borderBottom: "1px solid var(--line)", padding: "10px 0" }}>
+      <summary style={{ cursor: "pointer", display: "flex", justifyContent: "space-between", gap: 12 }}>
+        <span><b>{voucher.date}</b> · {titleCase(voucher.voucher_type)} #{voucher.voucher_number} · {voucher.narration || "—"}</span>
+        <span>NPR {money(voucher.debit)}</span>
+      </summary>
+      <table className="tbl" style={{ marginTop: 10 }}>
+        <thead><tr><th>Account</th><th>Description</th><th className="num">Debit</th><th className="num">Credit</th></tr></thead>
+        <tbody>{(voucher.lines || []).map((line) => <tr key={line.line_id}>
+          <td>{line.account_code} · {line.account_name}</td><td>{line.description || "—"}</td>
+          <td className="num">{Number(line.debit) ? money(line.debit) : ""}</td><td className="num">{Number(line.credit) ? money(line.credit) : ""}</td>
+        </tr>)}</tbody>
+      </table>
+    </details>)}
+    <p className="note">Total debit: <b>NPR {money(data.total_debit)}</b> · Total credit: <b>NPR {money(data.total_credit)}</b></p>
+  </div>;
+}
+
+function TrialBalance({ data, onDrill }) {
+  return <div className="report-wrap">
+    <div className="report-title">Trial Balance</div><div className="report-period">As of {data.as_of}</div>
+    <StatusBanner good={data.balanced} goodText="Books balance — debits equal credits" badText="Trial Balance is out of balance" difference={data.difference} />
+    <table className="tbl"><thead><tr><th>Account</th><th>Report class</th><th className="num">Debit</th><th className="num">Credit</th></tr></thead>
+      <tbody>{(data.rows || []).map((row) => <tr key={row.account_id}>
+        <td><AccountButton row={row} onDrill={onDrill} /></td><td>{titleCase(row.report_class)}</td>
+        <td className="num">{Number(row.debit) ? money(row.debit) : ""}</td><td className="num">{Number(row.credit) ? money(row.credit) : ""}</td>
+      </tr>)}</tbody>
+      <tfoot><tr><td colSpan={2}><b>Total</b></td><td className="num"><b>{money(data.total_debit)}</b></td><td className="num"><b>{money(data.total_credit)}</b></td></tr></tfoot>
+    </table>
+  </div>;
+}
+
+function ReportSection({ title, rows, onDrill, total }) {
+  return <div className="report-section">
+    <div className="report-section-title">{title}</div>
+    <table className="tbl"><tbody>{rows.map((row) => <tr key={row.account_id}>
+      <td><AccountButton row={row} onDrill={onDrill} /></td><td className="num">{signedMoney(row.amount)}</td>
+    </tr>)}</tbody><tfoot><tr><td><b>Total {title}</b></td><td className="num"><b>{signedMoney(total)}</b></td></tr></tfoot></table>
+  </div>;
+}
+
+function ProfitLoss({ data, onDrill }) {
   const rows = data.rows || [];
-  const totalDebit = rows.reduce((s, r) => s + Number(r.debit), 0);
-  const totalCredit = rows.reduce((s, r) => s + Number(r.credit), 0);
-  const balanced = Math.abs(totalDebit - totalCredit) < 0.005;
-  return (
-    <div className="report-wrap">
-      <div className="report-title">Trial Balance</div>
-      <div className="report-period">As of today — every account's net balance</div>
-      <button className="ghost-btn no-print" onClick={()=>window.print()} style={{marginBottom:16}}>🖨 Print</button>
+  return <div className="report-wrap"><div className="report-title">Profit & Loss Statement</div><div className="report-period">{data.from} to {data.to}</div>
+    <ReportSection title="Revenue" rows={rows.filter((r) => r.report_class === "revenue")} total={data.revenue} onDrill={onDrill} />
+    <ReportSection title="Cost of Sales" rows={rows.filter((r) => r.report_class === "cost_of_sales")} total={data.cost_of_sales} onDrill={onDrill} />
+    <div className="net-result profit"><span>Gross Profit</span><span>NPR {signedMoney(data.gross_profit)}</span></div>
+    <ReportSection title="Operating Expense" rows={rows.filter((r) => r.report_class === "operating_expense")} total={data.operating_expense} onDrill={onDrill} />
+    <ReportSection title="Other Income" rows={rows.filter((r) => r.report_class === "other_income")} total={data.other_income} onDrill={onDrill} />
+    <ReportSection title="Other Expense" rows={rows.filter((r) => r.report_class === "other_expense")} total={data.other_expense} onDrill={onDrill} />
+    <div className={`net-result ${Number(data.net_profit) >= 0 ? "profit" : "loss"}`}><span>Net {Number(data.net_profit) >= 0 ? "Profit" : "Loss"}</span><span>NPR {signedMoney(data.net_profit)}</span></div>
+  </div>;
+}
 
-      <div className={"net-result "+(balanced?"profit":"loss")} style={{marginBottom:16}}>
-        <span>{balanced ? "✓ Books balance — debits equal credits" : "✗ Out of balance — investigate"}</span>
-        <span>{balanced ? "" : "Δ NPR " + fmt(totalDebit - totalCredit)}</span>
-      </div>
+function BalanceSheet({ data, onDrill }) {
+  const rows = data.rows || [];
+  const groups = [
+    ["Current Assets", "current_asset"], ["Non-current Assets", "non_current_asset"],
+    ["Current Liabilities", "current_liability"], ["Non-current Liabilities", "non_current_liability"], ["Equity", "equity"],
+  ];
+  return <div className="report-wrap"><div className="report-title">Balance Sheet</div><div className="report-period">As of {data.as_of}</div>
+    <StatusBanner good={data.balanced} goodText="Balance Sheet reconciles to the ledger" badText="Assets do not equal liabilities and equity" difference={data.difference} />
+    {groups.map(([label, key]) => <ReportSection key={key} title={label} rows={rows.filter((r) => r.report_class === key)} total={rows.filter((r) => r.report_class === key).reduce((sum, row) => sum + Number(row.amount), 0)} onDrill={onDrill} />)}
+    <table className="tbl"><tbody>
+      <tr><td>Current earnings</td><td className="num">{signedMoney(data.current_earnings)}</td></tr>
+      <tr><td><b>Total Assets</b></td><td className="num"><b>{money(data.total_assets)}</b></td></tr>
+      <tr><td><b>Total Liabilities & Equity</b></td><td className="num"><b>{money(data.liabilities_and_equity)}</b></td></tr>
+    </tbody></table>
+  </div>;
+}
 
-      <table className="tbl">
-        <thead><tr><th>Code</th><th>Account</th><th>Report class</th><th className="num">Debit</th><th className="num">Credit</th></tr></thead>
-        <tbody>
-          {rows.map(r=>(
-            <tr key={r.account_id}>
-              <td>{r.account_code}</td>
-              <td>{r.name}</td>
-              <td className="muted">{String(r.report_class || r.group_name).replaceAll("_", " ")}</td>
-              <td className="num">{Number(r.debit) ? fmt(Number(r.debit)) : ""}</td>
-              <td className="num">{Number(r.credit) ? fmt(Number(r.credit)) : ""}</td>
-            </tr>
-          ))}
-        </tbody>
-        <tfoot>
-          <tr>
-            <td colSpan={3}><b>Total</b></td>
-            <td className="num"><b>{fmt(totalDebit)}</b></td>
-            <td className="num"><b>{fmt(totalCredit)}</b></td>
-          </tr>
-        </tfoot>
-      </table>
+function CashFlow({ data }) {
+  const rows = data.rows || [];
+  return <div className="report-wrap"><div className="report-title">Cash Flow Statement</div><div className="report-period">{data.from} to {data.to}</div>
+    <StatusBanner good={data.reconciled} goodText="Cash Flow reconciles to cash and bank ledgers" badText="Cash Flow does not reconcile" difference={data.difference} />
+    <table className="tbl"><tbody>
+      <tr><td>Opening cash and bank</td><td className="num">{signedMoney(data.opening_cash)}</td></tr>
+      <tr><td>Net cash from operating activities</td><td className="num">{signedMoney(data.operating)}</td></tr>
+      <tr><td>Net cash from investing activities</td><td className="num">{signedMoney(data.investing)}</td></tr>
+      <tr><td>Net cash from financing activities</td><td className="num">{signedMoney(data.financing)}</td></tr>
+      <tr><td><b>Closing cash and bank</b></td><td className="num"><b>{signedMoney(data.closing_cash)}</b></td></tr>
+    </tbody></table>
+    <div className="report-section-title" style={{ marginTop: 20 }}>Cash movements</div>
+    <table className="tbl"><thead><tr><th>Date</th><th>Voucher</th><th>Narration</th><th>Category</th><th className="num">Amount</th></tr></thead>
+      <tbody>{rows.map((row, index) => <tr key={`${row.voucher_id}-${row.cash_flow_category}-${index}`}><td>{row.date}</td><td>{titleCase(row.voucher_type)} #{row.voucher_number}</td><td>{row.narration || "—"}</td><td>{titleCase(row.cash_flow_category)}</td><td className="num">{signedMoney(row.amount)}</td></tr>)}</tbody>
+    </table>
+  </div>;
+}
+
+function Ageing({ data, kind }) {
+  const isReceivable = kind === "receivables";
+  return <div className="report-wrap"><div className="report-title">{isReceivable ? "Receivables" : "Payables"} Ageing</div><div className="report-period">As of {data.as_of}</div>
+    <StatusBanner good={data.reconciled} goodText="Ageing reconciles to the party ledgers" badText="Ageing differs from the party ledgers" difference={data.difference} />
+    <div className="stat-row" style={{ marginBottom: 16 }}>
+      {[['Current',data.current],['1–30 days',data.days_1_30],['31–60 days',data.days_31_60],['61–90 days',data.days_61_90],['Over 90 days',data.over_90]].map(([label, value]) => <div className="stat" key={label}><small>{label}</small><span>{money(value)}</span></div>)}
     </div>
-  );
+    <table className="tbl"><thead><tr><th>Document</th><th>{isReceivable ? "Customer" : "Supplier"}</th><th>Date</th><th>Due</th><th className="num">Net</th><th className="num">Paid</th><th className="num">Outstanding</th><th>Bucket</th></tr></thead>
+      <tbody>{(data.rows || []).map((row) => <tr key={row.document_id}><td>#{isReceivable ? row.invoice_number : row.bill_number}</td><td>{isReceivable ? row.party_name : row.vendor_name}</td><td>{isReceivable ? row.invoice_date : row.bill_date}</td><td>{row.due_date || "—"}</td><td className="num">{money(row.net_amount)}</td><td className="num">{money(row.paid_amount)}</td><td className="num"><b>{money(row.outstanding)}</b></td><td>{titleCase(row.bucket)}</td></tr>)}</tbody>
+      <tfoot><tr><td colSpan={6}><b>Total</b></td><td className="num"><b>{money(data.total)}</b></td><td /></tr></tfoot>
+    </table>
+    <p className="note">Ledger balance: <b>NPR {money(data.ledger_balance)}</b></p>
+  </div>;
 }
 
-// ── P&L ──────────────────────────────────────────────────────
-function buildPL(balances, from, to) {
-  const income = balances.filter(b => ["revenue", "other_income"].includes(b.account.report_class));
-  const expense = balances.filter(b => ["cost_of_sales", "operating_expense", "other_expense"].includes(b.account.report_class));
-  const totalIncome = income.reduce((s,b) => s + (-b.balance), 0);
-  const totalExpense = expense.reduce((s,b) => s + b.balance, 0);
-  return { income, expense, totalIncome, totalExpense, netProfit: totalIncome - totalExpense };
+function Register({ data, kind }) {
+  return <div className="report-wrap"><div className="report-title">{kind === "sales" ? "Sales" : "Purchase"} Register</div><div className="report-period">{data.from} to {data.to}</div>
+    <table className="tbl"><thead><tr><th>Date</th><th>Type / #</th><th>Party</th><th>PAN/VAT</th><th className="num">Taxable</th><th className="num">VAT</th><th className="num">Total</th></tr></thead>
+      <tbody>{(data.rows || []).map((row) => <tr key={`${row.document_type}-${row.document_id}`}><td>{row.document_date}</td><td>{titleCase(row.document_type)} #{row.document_number}</td><td>{row.party_name}</td><td>{row.pan_vat || "—"}</td><td className="num">{signedMoney(row.subtotal)}</td><td className="num">{signedMoney(row.vat_amount)}</td><td className="num"><b>{signedMoney(row.total)}</b></td></tr>)}</tbody>
+      <tfoot><tr><td colSpan={4}><b>Net total</b></td><td className="num"><b>{signedMoney(data.subtotal)}</b></td><td className="num"><b>{signedMoney(data.vat)}</b></td><td className="num"><b>{signedMoney(data.total)}</b></td></tr></tfoot>
+    </table>
+  </div>;
 }
 
-function PLView({ data, fromDate, toDate }) {
-  return (
-    <div className="report-wrap">
-      <div className="report-title">Profit & Loss Statement</div>
-      <div className="report-period">{fromDate} to {toDate}</div>
-      <button className="ghost-btn no-print" onClick={()=>window.print()} style={{marginBottom:16}}>🖨 Print</button>
+function VatReport({ data }) {
+  return <div className="report-wrap"><div className="report-title">VAT Report</div><div className="report-period">{data.from} to {data.to}</div>
+    <StatusBanner good={data.reconciled} goodText="VAT documents reconcile to VAT ledgers" badText="VAT documents and ledger differ" difference={Math.max(Math.abs(Number(data.output_variance)), Math.abs(Number(data.input_variance)))} />
+    <table className="tbl"><tbody>
+      <tr><td>Output VAT</td><td className="num">{money(data.output_vat)}</td><td className="muted">Ledger {money(data.output_vat_ledger)}</td></tr>
+      <tr><td>Input VAT</td><td className="num">{money(data.input_vat)}</td><td className="muted">Ledger {money(data.input_vat_ledger)}</td></tr>
+      <tr><td><b>Net VAT payable</b></td><td className="num"><b>{signedMoney(data.net_vat_payable)}</b></td><td /></tr>
+    </tbody></table>
+    <table className="tbl" style={{ marginTop: 18 }}><thead><tr><th>Date</th><th>Source</th><th>Party</th><th className="num">Output VAT</th><th className="num">Input VAT</th></tr></thead>
+      <tbody>{(data.rows || []).map((row) => <tr key={`${row.source_type}-${row.source_id}`}><td>{row.document_date}</td><td>{titleCase(row.source_type)} #{row.document_number}</td><td>{row.party_name}</td><td className="num">{Number(row.output_vat) ? signedMoney(row.output_vat) : ""}</td><td className="num">{Number(row.input_vat) ? signedMoney(row.input_vat) : ""}</td></tr>)}</tbody>
+    </table>
+  </div>;
+}
 
-      <div className="report-section">
-        <div className="report-section-title">Income</div>
-        <table className="tbl">
-          <tbody>
-            {data.income.map(b=>(
-              <tr key={b.account.id}>
-                <td>{b.account.account_code} · {b.account.name}<span className="bs-grp">{b.account.report_class?.replaceAll("_", " ")}</span></td>
-                <td className="num">{fmt(-b.balance)}</td>
-              </tr>
-            ))}
-          </tbody>
-          <tfoot><tr><td><b>Total Income</b></td><td className="num"><b>{fmt(data.totalIncome)}</b></td></tr></tfoot>
-        </table>
-      </div>
+function StockValuation({ data }) {
+  return <div className="report-wrap"><div className="report-title">Stock Valuation</div><div className="report-period">As of {data.as_of} · Moving weighted average</div>
+    <StatusBanner good={data.reconciled} goodText="Stock valuation reconciles to Inventory Asset" badText="Stock valuation differs from Inventory Asset" difference={data.difference} />
+    <table className="tbl"><thead><tr><th>SKU</th><th>Item</th><th>Category</th><th className="num">Quantity</th><th>Unit</th><th className="num">Average cost</th><th className="num">Value</th></tr></thead>
+      <tbody>{(data.rows || []).map((row) => <tr key={row.item_id}><td>{row.sku || "—"}</td><td>{row.name}</td><td>{row.category_name || "—"}</td><td className="num">{Number(row.quantity).toLocaleString()}</td><td>{row.unit}</td><td className="num">{money(row.average_cost)}</td><td className="num"><b>{money(row.inventory_value)}</b></td></tr>)}</tbody>
+      <tfoot><tr><td colSpan={6}><b>Total stock valuation</b></td><td className="num"><b>{money(data.stock_valuation)}</b></td></tr></tfoot>
+    </table>
+    <p className="note">Inventory Asset ledger: <b>NPR {money(data.inventory_ledger_balance)}</b></p>
+  </div>;
+}
 
-      <div className="report-section">
-        <div className="report-section-title">Expenses</div>
-        <table className="tbl">
-          <tbody>
-            {data.expense.map(b=>(
-              <tr key={b.account.id}>
-                <td>{b.account.account_code} · {b.account.name}<span className="bs-grp">{b.account.report_class?.replaceAll("_", " ")}</span></td>
-                <td className="num">{fmt(b.balance)}</td>
-              </tr>
-            ))}
-          </tbody>
-          <tfoot><tr><td><b>Total Expenses</b></td><td className="num"><b>{fmt(data.totalExpense)}</b></td></tr></tfoot>
-        </table>
-      </div>
-
-      <div className={"net-result "+(data.netProfit>=0?"profit":"loss")}>
-        <span>{data.netProfit>=0?"Net Profit":"Net Loss"}</span>
-        <span>NPR {fmt(data.netProfit)}</span>
-      </div>
+function LedgerDrilldown({ account, fromDate, toDate, fiscalYear, onClose }) {
+  const [data, setData] = useState(null);
+  const [error, setError] = useState(null);
+  useEffect(() => {
+    getGeneralLedgerReport({ accountId: account.id, fromDate, toDate, fiscalYear: fiscalYear || null })
+      .then(setData).catch((err) => setError(err.message));
+  }, [account.id, fromDate, toDate, fiscalYear]);
+  return <div className="modal-overlay" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
+    <div className="modal-card" style={{ maxWidth: 1000 }}>
+      <div className="panel-head"><h3>{account.account_code} · {account.name}</h3><button className="ghost-btn" onClick={onClose}>Close</button></div>
+      {error && <p className="msg err">{error}</p>}
+      {!data ? <p className="note">Loading ledger…</p> : <>
+        <p className="note">Opening: {signedMoney(data.opening_balance)} · Closing: {signedMoney(data.closing_balance)}</p>
+        <div style={{ overflowX: "auto" }}><table className="tbl"><thead><tr><th>Date</th><th>Voucher</th><th>Description</th><th className="num">Debit</th><th className="num">Credit</th><th className="num">Balance</th></tr></thead>
+          <tbody>{(data.rows || []).map((row) => <tr key={row.id}><td>{row.date}</td><td>{titleCase(row.voucher_type)} #{row.voucher_number}</td><td>{row.description || row.narration || "—"}</td><td className="num">{Number(row.debit) ? money(row.debit) : ""}</td><td className="num">{Number(row.credit) ? money(row.credit) : ""}</td><td className="num">{signedMoney(row.running_balance)}</td></tr>)}</tbody>
+        </table></div>
+      </>}
     </div>
-  );
+  </div>;
 }
 
-// ── Balance Sheet ─────────────────────────────────────────────
-function buildBS(balances) {
-  const safe = balances.filter(b => b && b.account);
-  const currentAssets = safe.filter(b => b.account.report_class === "current_asset");
-  const nonCurrentAssets = safe.filter(b => b.account.report_class === "non_current_asset");
-  const currentLiab = safe.filter(b => b.account.report_class === "current_liability");
-  const longTermLiab = safe.filter(b => b.account.report_class === "non_current_liability");
-  const assets = [...currentAssets, ...nonCurrentAssets];
-  const liabilities = [...currentLiab, ...longTermLiab];
-  const equity = safe.filter(b => b.account.report_class === "equity");
-  const income = safe.filter(b => ["revenue", "other_income"].includes(b.account.report_class));
-  const expense = safe.filter(b => ["cost_of_sales", "operating_expense", "other_expense"].includes(b.account.report_class));
-
-  // Net profit = structured income less structured expenses.
-  const totalIncome  = income.reduce((s,b) => s + (-b.balance), 0);
-  const totalExpense = expense.reduce((s,b) => s + b.balance, 0);
-  const netProfit    = totalIncome - totalExpense;
-
-  const totalAssets      = assets.reduce((s,b) => s + b.balance, 0);
-  const totalLiabilities = liabilities.reduce((s,b) => s + (-b.balance), 0);
-  const totalEquity      = equity.reduce((s,b) => s + (-b.balance), 0) + netProfit;
-
-  return {
-    assets, currentAssets, nonCurrentAssets,
-    liabilities, currentLiab, longTermLiab,
-    equity, netProfit,
-    totalAssets, totalLiabilities, totalEquity,
-  };
-}
-
-function BSView({ data }) {
-  if (!data) return <p className="note">Loading…</p>;
-  const {
-    currentAssets=[], nonCurrentAssets=[], currentLiab=[], longTermLiab=[],
-    equity=[], netProfit=0, totalAssets=0, totalLiabilities=0, totalEquity=0,
-  } = data;
-
-  const totalCurrentAssets    = currentAssets.reduce((s,b)=>s+b.balance,0);
-  const totalNonCurrentAssets = nonCurrentAssets.reduce((s,b)=>s+b.balance,0);
-  const totalCurrentLiab      = currentLiab.reduce((s,b)=>s+(-b.balance),0);
-  const totalLongTermLiab     = longTermLiab.reduce((s,b)=>s+(-b.balance),0);
-  const totalEquityAccounts   = equity.reduce((s,b)=>s+(-b.balance),0);
-  const isBalanced = Math.abs(totalAssets - totalLiabilities - totalEquity) < 0.5;
-  const today = new Date().toLocaleDateString("en-NP",{year:"numeric",month:"long",day:"numeric"});
-
-  return (
-    <div className="report-wrap">
-      <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",flexWrap:"wrap",gap:8,marginBottom:4}}>
-        <div>
-          <div className="report-title">Balance Sheet</div>
-          <div className="report-period">As of {today}</div>
-        </div>
-        <button className="ghost-btn no-print" onClick={()=>window.print()}>🖨 Print</button>
-      </div>
-
-      {/* ── Imbalance warning ── */}
-      {!isBalanced && (
-        <div className="msg err" style={{marginBottom:16}}>
-          <b>⚠ Out of balance by NPR {fmt(Math.abs(totalAssets - totalLiabilities - totalEquity))}</b>
-          <div style={{marginTop:6,fontSize:12}}>
-            Most likely cause: an incomplete legacy opening balance or an unbalanced migration.
-            Fix: use <b>Chart of Accounts → Opening Journal</b> and post a balanced debit/credit entry.
-          </div>
-        </div>
-      )}
-      {isBalanced && (
-        <div className="msg ok" style={{marginBottom:16}}>✓ Balance Sheet balances — Assets equal Liabilities + Equity</div>
-      )}
-
-      <div className="bs-vert">
-
-        {/* ══ EQUITY & LIABILITIES ══════════════════════════════════ */}
-        <div className="bs-block">
-          <div className="bs-block-hd">EQUITY &amp; LIABILITIES</div>
-
-          {/* Shareholders' Equity */}
-          <div className="bs-sub-hd">Shareholders' Equity</div>
-          {equity.map(b=>(
-            <div key={b.account.id} className="bs-row">
-              <span>{b.account.name}</span>
-              <span className="bs-amt">{fmt(-b.balance)}</span>
-            </div>
-          ))}
-          <div className="bs-row bs-net-row">
-            <span>Net Profit / (Loss) for the period</span>
-            <span className="bs-amt" style={{color: netProfit>=0?"var(--green2)":"var(--rust)"}}>
-              {netProfit>=0?"":"-"}{fmt(netProfit)}
-            </span>
-          </div>
-          <div className="bs-subtotal">
-            <span>Total Equity</span>
-            <span className="bs-amt"><b>{fmt(totalEquity)}</b></span>
-          </div>
-
-          {/* Long-term Liabilities */}
-          {longTermLiab.length > 0 && <>
-            <div className="bs-sub-hd" style={{marginTop:16}}>Non-Current Liabilities</div>
-            {longTermLiab.map(b=>(
-              <div key={b.account.id} className="bs-row">
-                <span>{b.account.account_code} · {b.account.name}<span className="bs-grp">{b.account.report_class?.replaceAll("_", " ")}</span></span>
-                <span className="bs-amt">{fmt(-b.balance)}</span>
-              </div>
-            ))}
-            <div className="bs-subtotal">
-              <span>Total Non-Current Liabilities</span>
-              <span className="bs-amt"><b>{fmt(totalLongTermLiab)}</b></span>
-            </div>
-          </>}
-
-          {/* Current Liabilities */}
-          <div className="bs-sub-hd" style={{marginTop:16}}>Current Liabilities</div>
-          {currentLiab.length === 0
-            ? <div className="bs-row muted"><span>—</span><span className="bs-amt">0.00</span></div>
-            : currentLiab.map(b=>(
-              <div key={b.account.id} className="bs-row">
-                <span>{b.account.account_code} · {b.account.name}<span className="bs-grp">{b.account.report_class?.replaceAll("_", " ")}</span></span>
-                <span className="bs-amt">{fmt(-b.balance)}</span>
-              </div>
-            ))
-          }
-          <div className="bs-subtotal">
-            <span>Total Current Liabilities</span>
-            <span className="bs-amt"><b>{fmt(totalCurrentLiab)}</b></span>
-          </div>
-
-          <div className="bs-grand">
-            <span>TOTAL EQUITY &amp; LIABILITIES</span>
-            <span className="bs-amt">NPR {fmt(totalLiabilities + totalEquity)}</span>
-          </div>
-        </div>
-
-        {/* ══ ASSETS ═══════════════════════════════════════════════ */}
-        <div className="bs-block">
-          <div className="bs-block-hd">ASSETS</div>
-
-          {/* Non-current assets */}
-          {nonCurrentAssets.length > 0 && <>
-            <div className="bs-sub-hd">Non-Current Assets</div>
-            {nonCurrentAssets.map(b=>(
-              <div key={b.account.id} className="bs-row">
-                <span>{b.account.account_code} · {b.account.name}<span className="bs-grp">{b.account.report_class?.replaceAll("_", " ")}</span></span>
-                <span className="bs-amt">{fmt(b.balance)}</span>
-              </div>
-            ))}
-            <div className="bs-subtotal">
-              <span>Total Non-Current Assets</span>
-              <span className="bs-amt"><b>{fmt(totalNonCurrentAssets)}</b></span>
-            </div>
-          </>}
-
-          {/* Current assets */}
-          <div className="bs-sub-hd" style={{marginTop: nonCurrentAssets.length>0?16:0}}>Current Assets</div>
-          {currentAssets.length === 0
-            ? <div className="bs-row muted"><span>—</span><span className="bs-amt">0.00</span></div>
-            : currentAssets.map(b=>(
-              <div key={b.account.id} className="bs-row">
-                <span>{b.account.account_code} · {b.account.name}<span className="bs-grp">{b.account.report_class?.replaceAll("_", " ")}</span></span>
-                <span className="bs-amt">{fmt(b.balance)}</span>
-              </div>
-            ))
-          }
-          <div className="bs-subtotal">
-            <span>Total Current Assets</span>
-            <span className="bs-amt"><b>{fmt(totalCurrentAssets)}</b></span>
-          </div>
-
-          <div className="bs-grand">
-            <span>TOTAL ASSETS</span>
-            <span className="bs-amt">NPR {fmt(totalAssets)}</span>
-          </div>
-        </div>
-
-      </div>
-    </div>
-  );
-}
-
-// ── VAT Summary ───────────────────────────────────────────────
-function buildVAT(invoices, bills, from, to) {
-  const filteredInv = invoices.filter(i => i.invoice_date >= from && i.invoice_date <= to);
-  const filteredBills = bills.filter(b => b.bill_date >= from && b.bill_date <= to);
-  const outputVat = filteredInv.reduce((s,i) => s + Number(i.vat_amount), 0);
-  const inputVat = filteredBills.reduce((s,b) => s + Number(b.vat_amount), 0);
-  const vatPayable = outputVat - inputVat;
-  return { invoices: filteredInv, bills: filteredBills, outputVat, inputVat, vatPayable };
-}
-
-function VATView({ data, fromDate, toDate }) {
-  return (
-    <div className="report-wrap">
-      <div className="report-title">VAT Summary Report</div>
-      <div className="report-period">{fromDate} to {toDate}</div>
-      <button className="ghost-btn no-print" onClick={()=>window.print()} style={{marginBottom:16}}>🖨 Print</button>
-
-      <div className="vat-grid">
-        <div className="vat-card">
-          <div className="vat-card-title">Output VAT (Sales)</div>
-          <div className="vat-card-amount">NPR {fmt(data.outputVat)}</div>
-          <div className="muted" style={{fontSize:12}}>From {data.invoices.length} invoices</div>
-          <table className="tbl" style={{marginTop:12}}>
-            <thead><tr><th>Invoice #</th><th>Customer</th><th className="num">Taxable</th><th className="num">VAT 13%</th></tr></thead>
-            <tbody>
-              {data.invoices.map(i=>(
-                <tr key={i.id}>
-                  <td>{i.fiscal_year}-{String(i.invoice_number).padStart(4,"0")}</td>
-                  <td>{i.party_name}</td>
-                  <td className="num">{fmt(Number(i.subtotal))}</td>
-                  <td className="num">{fmt(Number(i.vat_amount))}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-
-        <div className="vat-card">
-          <div className="vat-card-title">Input VAT (Purchases)</div>
-          <div className="vat-card-amount">NPR {fmt(data.inputVat)}</div>
-          <div className="muted" style={{fontSize:12}}>From {data.bills.length} bills</div>
-          <table className="tbl" style={{marginTop:12}}>
-            <thead><tr><th>Bill #</th><th>Vendor</th><th className="num">Taxable</th><th className="num">VAT 13%</th></tr></thead>
-            <tbody>
-              {data.bills.map(b=>(
-                <tr key={b.id}>
-                  <td>{b.fiscal_year}-PB-{String(b.bill_number).padStart(4,"0")}</td>
-                  <td>{b.vendor_name}</td>
-                  <td className="num">{fmt(Number(b.subtotal))}</td>
-                  <td className="num">{fmt(Number(b.vat_amount))}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      <div className={"net-result "+(data.vatPayable>=0?"loss":"profit")} style={{marginTop:20}}>
-        <span>{data.vatPayable>=0?"VAT Payable to IRD":"VAT Refundable from IRD"}</span>
-        <span>NPR {fmt(data.vatPayable)}</span>
-      </div>
-      <p className="note">Output VAT ({fmt(data.outputVat)}) − Input VAT ({fmt(data.inputVat)}) = {data.vatPayable>=0?"payable":"refundable"} NPR {fmt(data.vatPayable)}</p>
-    </div>
-  );
-}
-
-// ── Ageing ────────────────────────────────────────────────────
-function buildAgeing(accounts, lines) {
-  const today = new Date().toISOString().slice(0,10);
-  const parties = accounts.filter(a => a.is_party_account);
-  const result = parties.map(a => {
-    const ob = a.opening_balance_type === "debit" ? Number(a.opening_balance) : -Number(a.opening_balance);
-    const balance = lines
-      .filter(l => l.account_id === a.id)
-      .reduce((s,l) => s + Number(l.debit) - Number(l.credit), ob);
-    return { account: a, balance };
-  }).filter(r => Math.abs(r.balance) > 0.01);
-
-  const receivables = result.filter(r => r.balance > 0);
-  const payables = result.filter(r => r.balance < 0);
-  return { receivables, payables, today };
-}
-
-function AgeingView({ data }) {
-  const totalRec = data.receivables.reduce((s,r) => s+r.balance, 0);
-  const totalPay = data.payables.reduce((s,r) => s+Math.abs(r.balance), 0);
-  return (
-    <div className="report-wrap">
-      <div className="report-title">Receivables & Payables</div>
-      <div className="report-period">As of today</div>
-      <button className="ghost-btn no-print" onClick={()=>window.print()} style={{marginBottom:16}}>🖨 Print</button>
-
-      <div className="bs-grid">
-        <div>
-          <div className="report-section">
-            <div className="report-section-title" style={{color:"var(--green2)"}}>Receivables (तपाईंले पाउने)</div>
-            <table className="tbl">
-              <thead><tr><th>Customer</th><th className="num">Balance</th></tr></thead>
-              <tbody>{data.receivables.map(r=><tr key={r.account.id}><td>{r.account.name}</td><td className="num">{fmt(r.balance)}</td></tr>)}</tbody>
-              <tfoot><tr><td><b>Total Receivable</b></td><td className="num"><b>NPR {fmt(totalRec)}</b></td></tr></tfoot>
-            </table>
-          </div>
-        </div>
-        <div>
-          <div className="report-section">
-            <div className="report-section-title" style={{color:"var(--rust)"}}>Payables (तपाईंले दिनुपर्ने)</div>
-            <table className="tbl">
-              <thead><tr><th>Vendor</th><th className="num">Balance</th></tr></thead>
-              <tbody>{data.payables.map(r=><tr key={r.account.id}><td>{r.account.name}</td><td className="num">{fmt(Math.abs(r.balance))}</td></tr>)}</tbody>
-              <tfoot><tr><td><b>Total Payable</b></td><td className="num"><b>NPR {fmt(totalPay)}</b></td></tr></tfoot>
-            </table>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ── Sales Report ──────────────────────────────────────────────
-function buildSales(invoices, from, to) {
-  const filtered = invoices.filter(i => i.invoice_date >= from && i.invoice_date <= to);
-  const total = filtered.reduce((s,i) => s+Number(i.total), 0);
-  const totalVat = filtered.reduce((s,i) => s+Number(i.vat_amount), 0);
-  const totalSubtotal = filtered.reduce((s,i) => s+Number(i.subtotal), 0);
-  const paid = filtered.reduce((s,i)=>s+Number(i.amount_paid || 0),0);
-  const unpaid = filtered.reduce((s,i)=>s+Number(i.outstanding_amount ?? i.total),0);
-  return { invoices: filtered, total, totalVat, totalSubtotal, paid, unpaid };
-}
-
-function SalesView({ data, fromDate, toDate }) {
-  return (
-    <div className="report-wrap">
-      <div className="report-title">Sales Report</div>
-      <div className="report-period">{fromDate} to {toDate}</div>
-      <button className="ghost-btn no-print" onClick={()=>window.print()} style={{marginBottom:16}}>🖨 Print</button>
-
-      <div className="stat-row" style={{marginBottom:16}}>
-        <div className="stat"><span>NPR {fmt(data.totalSubtotal)}</span>Net Sales</div>
-        <div className="stat"><span>NPR {fmt(data.totalVat)}</span>Output VAT</div>
-        <div className="stat"><span>NPR {fmt(data.total)}</span>Gross Total</div>
-        <div className="stat"><span style={{color:"var(--green2)"}}>NPR {fmt(data.paid)}</span>Collected</div>
-        <div className="stat"><span style={{color:"var(--rust)"}}>NPR {fmt(data.unpaid)}</span>Outstanding</div>
-      </div>
-
-      <table className="tbl">
-        <thead><tr><th>Invoice #</th><th>Date</th><th>Customer</th><th>Status</th><th className="num">Collected</th><th className="num">Outstanding</th><th className="num">Total</th></tr></thead>
-        <tbody>
-          {data.invoices.map(i=>(
-            <tr key={i.id}>
-              <td>{i.fiscal_year}-{String(i.invoice_number).padStart(4,"0")}</td>
-              <td>{i.invoice_date}</td>
-              <td>{i.party_name}</td>
-              <td><span className={"status-"+i.status}>{i.status}</span></td>
-              <td className="num">{fmt(Number(i.amount_paid || 0))}</td>
-              <td className="num">{fmt(Number(i.outstanding_amount ?? i.total))}</td>
-              <td className="num"><b>{fmt(Number(i.total))}</b></td>
-            </tr>
-          ))}
-        </tbody>
-        <tfoot>
-          <tr>
-            <td colSpan={4}><b>Total</b></td>
-            <td className="num"><b>{fmt(data.paid)}</b></td>
-            <td className="num"><b>{fmt(data.unpaid)}</b></td>
-            <td className="num"><b>NPR {fmt(data.total)}</b></td>
-          </tr>
-        </tfoot>
-      </table>
-    </div>
-  );
+function csvSpec(report, data) {
+  if (!data) return null;
+  const rows = data.rows || [];
+  if (report === "tb") return { rows, columns: [
+    { label: "Account code", value: "account_code" }, { label: "Account", value: "name" },
+    { label: "Report class", value: "report_class" }, { label: "Debit", value: "debit" }, { label: "Credit", value: "credit" },
+  ] };
+  if (["pl", "bs"].includes(report)) return { rows, columns: [
+    { label: "Account code", value: "account_code" }, { label: "Account", value: "name" },
+    { label: "Report class", value: "report_class" }, { label: "Amount", value: "amount" },
+  ] };
+  if (["receivables", "payables"].includes(report)) return { rows, columns: Object.keys(rows[0] || {}).map((key) => ({ label: titleCase(key), value: key })) };
+  if (["sales", "purchases", "vat", "stock", "cashflow"].includes(report)) return { rows, columns: Object.keys(rows[0] || {}).filter((key) => !key.endsWith("_id")).map((key) => ({ label: titleCase(key), value: key })) };
+  if (report === "daybook") return { rows, columns: [
+    { label: "Date", value: "date" }, { label: "Voucher type", value: "voucher_type" },
+    { label: "Voucher number", value: "voucher_number" }, { label: "Narration", value: "narration" },
+    { label: "Debit", value: "debit" }, { label: "Credit", value: "credit" },
+  ] };
+  return null;
 }

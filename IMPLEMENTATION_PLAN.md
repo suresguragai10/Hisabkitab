@@ -14,7 +14,7 @@ This plan converts the product audit into small releases. Each stage should be c
 
 ## Stage 1 — Restore manual vouchers
 
-Status: **completed in the Stage 1 remediation**
+Status: **started in this revision**
 
 1. Replace the duplicate Voucher Entry page with a real double-entry form.
 2. Support Journal, Payment, Receipt, and Contra vouchers.
@@ -48,8 +48,6 @@ Status: **completed in the Stage 1 remediation**
 
 ## Stage 2 — Make payments accurate
 
-Status: **implemented in v6.1.0; owner applied and verified the migration**
-
 1. Add `document_payments` and `payment_allocations` tables.
 2. Store every receipt and payment separately.
 3. Calculate paid amount and outstanding amount from allocations.
@@ -61,8 +59,6 @@ Status: **implemented in v6.1.0; owner applied and verified the migration**
 **Exit condition:** paying NPR 1 against an NPR 100 invoice leaves NPR 99 outstanding.
 
 ## Stage 3 — Correct inventory accounting
-
-Status: **implemented in v6.2.0; owner applied the migration and pushed the repository**
 
 1. Choose and document the inventory method: perpetual inventory is recommended.
 2. Add Inventory Asset, Cost of Goods Sold, Stock Adjustment, and Purchase Return accounts.
@@ -76,8 +72,6 @@ Status: **implemented in v6.2.0; owner applied the migration and pushed the repo
 
 ## Stage 4 — Rebuild document lifecycle
 
-Status: **implemented in v6.3.0; owner applied the migration and pushed the repository**
-
 1. Separate Draft, Posted, Cancelled, and Credited documents.
 2. Prohibit editing a posted financial document directly.
 3. Add controlled cancellation and reversal transactions.
@@ -88,8 +82,6 @@ Status: **implemented in v6.3.0; owner applied the migration and pushed the repo
 
 ## Stage 5 — Structured Chart of Accounts
 
-Status: **implemented in v6.4.0 source; staging migration and acceptance are pending**
-
 1. Add account code, parent account, report class, account subtype, and normal balance.
 2. Mark system accounts and control accounts.
 3. Stop classifying reports by account-name text.
@@ -98,7 +90,9 @@ Status: **implemented in v6.4.0 source; staging migration and acceptance are pen
 
 ## Stage 6 — Trustworthy reports
 
-Implement and reconcile in this order:
+Status: **implemented in v6.5.0; staging acceptance pending**
+
+Implemented and reconciled in this order:
 
 1. General Ledger
 2. Day Book
@@ -155,4 +149,4 @@ Every report should support date range, fiscal year, export, drill-down, and tot
 
 ## Immediate next development task
 
-Apply and accept the Stage 5 migration in staging using its preflight, verification, account-structure, opening-journal, and report-classification tests. After Stage 5 acceptance, proceed to **Stage 6: trustworthy reports** in the documented order.
+After Stage 6 database and acceptance tests pass, implement **Stage 7: VAT/TDS completeness, fiscal periods, server-enforced locks, and year-end closing**.

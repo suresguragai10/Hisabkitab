@@ -128,7 +128,10 @@ where cash_flow_category is null;
 
 update accounts
 set is_system_account = (system_code is not null),
-    is_control_account = (system_code in ('ar_control','ap_control','inventory_asset','vat_receivable','vat_payable')),
+    is_control_account = coalesce(
+      system_code in ('ar_control','ap_control','inventory_asset','vat_receivable','vat_payable'),
+      false
+    ),
     allow_manual_posting = case
       when system_code in ('sales','purchase','cogs','inventory_asset','vat_receivable','vat_payable','stock_adjustment','purchase_return','inventory_opening','ar_control','ap_control') then false
       else true
@@ -463,7 +466,7 @@ grant execute on function deactivate_structured_account(uuid) to authenticated;
 -- ------------------------------------------------------------
 alter table vouchers drop constraint if exists vouchers_voucher_type_check;
 alter table vouchers add constraint vouchers_voucher_type_check check (
-  voucher_type in ('journal','payment','receipt','contra','sales','purchase','opening')
+  voucher_type in ('journal','payment','receipt','contra','sales','purchase','credit_note','debit_note','opening')
 );
 
 create table if not exists opening_journals(
