@@ -3,6 +3,9 @@ import { supabase } from "../supabase";
 import { listParties } from "../lib/db";
 import { currentFiscalYear } from "../lib/fiscalYear";
 import { createBillWithPosting, refreshDocumentPaymentStatuses } from "../lib/posting";
+import { cancelBillDocument, deleteDocumentDraft, postBillDraft, saveBillDraft } from "../lib/lifecycle";
+import LifecycleActionModal from "../components/LifecycleActionModal";
+import DocumentActivityModal from "../components/DocumentActivityModal";
 import PaymentModal from "./PaymentModal";
 import { useBusinessProfile } from "../lib/businessProfile";
 
@@ -12,12 +15,6 @@ const blankLine = () => ({ itemId: "", description: "", quantity: "1", unit: "pc
 // ── helpers ───────────────────────────────────────────────────
 function calcAmount(l) { return (parseFloat(l.quantity)||0) * (parseFloat(l.rate)||0); }
 function calcVat(l) { return calcAmount(l) * ((parseFloat(l.vatRate)||0)/100); }
-
-async function nextBillNumber(fiscalYear) {
-  const { data, error } = await supabase.rpc("next_bill_number", { p_fiscal_year: fiscalYear });
-  if (error) throw error;
-  return data;
-}
 
 // NOTE: bill creation now goes through createBillWithPosting()
 // (see ../lib/posting.js), which inserts the bill AND its balanced
@@ -36,11 +33,6 @@ async function listBills() {
     .order("bill_date", { ascending: false });
   if (error) throw error;
   return data;
-}
-
-async function updateBillStatus(id, status) {
-  const { error } = await supabase.from("purchase_bills").update({ status }).eq("id", id);
-  if (error) throw error;
 }
 
 // ── Bill print view ───────────────────────────────────────────
@@ -115,230 +107,344 @@ function BillPrint({ bill, bizName, profile, onClose }) {
 }
 
 // ── Main Purchases page ───────────────────────────────────────
-export default function Purchases({ userId }) {
+export default function Purchases() {
   const [bills, setBills] = useState([]);
   const [parties, setParties] = useState([]);
+  const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [printBill, setPrintBill] = useState(null);
+  const [payModal, setPayModal] = useState(null);
+  const [activityDoc, setActivityDoc] = useState(null);
+  const [cancelDoc, setCancelDoc] = useState(null);
+  const [editingDraftId, setEditingDraftId] = useState(null);
   const [err, setErr] = useState(null);
   const [busy, setBusy] = useState(false);
-  const [items, setItems] = useState([]);
-  const [payModal, setPayModal] = useState(null);
   const [filter, setFilter] = useState("all");
-
   const { profile } = useBusinessProfile();
   const bizName = profile?.biz_name || "";
 
-  const [form, setForm] = useState({
+  const emptyForm = () => ({
+    fiscalYear: currentFiscalYear(),
     vendorId: "", vendorName: "", vendorAddress: "", vendorPan: "",
-    vendorBillRef: "", billDate: new Date().toISOString().slice(0,10),
+    vendorBillRef: "", billDate: new Date().toISOString().slice(0, 10),
     dueDate: "", notes: "",
   });
+  const [form, setForm] = useState(emptyForm);
   const [lines, setLines] = useState([blankLine(), blankLine()]);
+
+  const resetEditor = () => {
+    setEditingDraftId(null);
+    setForm(emptyForm());
+    setLines([blankLine(), blankLine()]);
+    setErr(null);
+  };
 
   const load = async () => {
     setLoading(true);
     try {
       await refreshDocumentPaymentStatuses();
-      const [bs, pts, itms] = await Promise.all([listBills(), listParties(), fetchItems()]);
-      setBills(bs);
-      setParties(pts);
-      setItems(itms);
-    } catch(e) { setErr(e.message); }
+      const [billRows, partyRows, itemRows] = await Promise.all([listBills(), listParties(), fetchItems()]);
+      setBills(billRows || []);
+      setParties(partyRows || []);
+      setItems(itemRows || []);
+    } catch (error) {
+      setErr(error.message);
+    }
     setLoading(false);
   };
 
   useEffect(() => { load(); }, []);
 
   const selectVendor = (vendorId) => {
-    const p = parties.find(p => p.id === vendorId);
-    if (p) setForm(f => ({ ...f, vendorId, vendorName: p.accounts?.name||"", vendorAddress: p.address||"", vendorPan: p.pan_vat_number||"" }));
-    else setForm(f => ({ ...f, vendorId:"", vendorName:"", vendorAddress:"", vendorPan:"" }));
+    const vendor = parties.find((party) => party.id === vendorId);
+    if (vendor) {
+      setForm((current) => ({
+        ...current,
+        vendorId,
+        vendorName: vendor.accounts?.name || "",
+        vendorAddress: vendor.address || "",
+        vendorPan: vendor.pan_vat_number || "",
+      }));
+    } else {
+      setForm((current) => ({ ...current, vendorId: "", vendorName: "", vendorAddress: "", vendorPan: "" }));
+    }
   };
 
-  const updateLine = (i, patch) => setLines(ls => ls.map((l,idx) => idx===i ? {...l,...patch} : l));
-  const addLine = () => setLines(ls => [...ls, blankLine()]);
-  const removeLine = (i) => setLines(ls => ls.filter((_,idx) => idx!==i));
-
-  const subtotal = lines.reduce((s,l) => s+calcAmount(l), 0);
-  const vatTotal = lines.reduce((s,l) => s+calcVat(l), 0);
+  const updateLine = (index, patch) => setLines((current) => current.map((line, lineIndex) => lineIndex === index ? { ...line, ...patch } : line));
+  const addLine = () => setLines((current) => [...current, blankLine()]);
+  const removeLine = (index) => setLines((current) => current.filter((_, lineIndex) => lineIndex !== index));
+  const subtotal = lines.reduce((sum, line) => sum + calcAmount(line), 0);
+  const vatTotal = lines.reduce((sum, line) => sum + calcVat(line), 0);
   const grandTotal = subtotal + vatTotal;
 
-  const submit = async (e) => {
-    e.preventDefault();
-    if (!form.vendorName.trim()) { setErr("Vendor name is required."); return; }
-    const validLines = lines.filter(l => l.description && parseFloat(l.rate));
-    if (validLines.length === 0) { setErr("Add at least one line item."); return; }
-    setBusy(true); setErr(null);
+  const buildDocument = () => {
+    if (!form.vendorName.trim()) throw new Error("Vendor name is required.");
+    const validLines = lines.filter((line) => line.description.trim() && Number(line.quantity) > 0 && Number(line.rate) >= 0);
+    if (validLines.length === 0) throw new Error("Add at least one valid line item.");
+    const postLines = validLines.map((line) => ({
+      item_id: line.itemId || null,
+      hsn_code: items.find((item) => item.id === line.itemId)?.hsn_code || null,
+      description: line.description.trim(),
+      quantity: parseFloat(line.quantity) || 1,
+      unit: line.unit || "pcs",
+      rate: parseFloat(line.rate) || 0,
+      amount: calcAmount(line),
+      vat_rate: parseFloat(line.vatRate) || 0,
+      vat_amount: calcVat(line),
+      line_total: calcAmount(line) + calcVat(line),
+    }));
+    const header = {
+      fiscal_year: form.fiscalYear,
+      bill_date: form.billDate,
+      due_date: form.dueDate || null,
+      vendor_id: form.vendorId || null,
+      vendor_name: form.vendorName.trim(),
+      vendor_address: form.vendorAddress.trim() || null,
+      vendor_pan: form.vendorPan.trim() || null,
+      vendor_bill_ref: form.vendorBillRef.trim() || null,
+      notes: form.notes.trim() || null,
+    };
+    return { header, postLines };
+  };
+
+  const persist = async (mode) => {
+    setBusy(true);
+    setErr(null);
     try {
-      const fiscalYear = currentFiscalYear();
-      const billNumber = await nextBillNumber(fiscalYear);
-      const postLines = validLines.map((l) => ({
-        item_id: l.itemId || null,
-        hsn_code: items.find((item) => item.id === l.itemId)?.hsn_code || null,
-        description: l.description,
-        quantity: parseFloat(l.quantity) || 1,
-        unit: l.unit || "pcs",
-        rate: parseFloat(l.rate) || 0,
-        amount: calcAmount(l),
-        vat_rate: parseFloat(l.vatRate) || VAT_RATE,
-        vat_amount: calcVat(l),
-        line_total: calcAmount(l) + calcVat(l),
-      }));
-      const header = {
-        bill_number: billNumber,
-        fiscal_year: fiscalYear,
-        bill_date: form.billDate,
-        due_date: form.dueDate || null,
-        vendor_id: form.vendorId || null,
-        vendor_name: form.vendorName.trim(),
-        vendor_address: form.vendorAddress.trim() || null,
-        vendor_pan: form.vendorPan.trim() || null,
-        vendor_bill_ref: form.vendorBillRef.trim() || null,
-        notes: form.notes.trim() || null,
-        status: "open",
-      };
-      const billId = await createBillWithPosting(header, postLines);
+      const { header, postLines } = buildDocument();
+      let billId;
+      if (mode === "draft") {
+        billId = await saveBillDraft(header, postLines, editingDraftId);
+      } else if (editingDraftId) {
+        billId = await saveBillDraft(header, postLines, editingDraftId);
+        await postBillDraft(billId);
+      } else {
+        billId = await createBillWithPosting(header, postLines);
+      }
+      resetEditor();
       setShowForm(false);
-      setLines([blankLine(), blankLine()]);
-      setForm({ vendorId:"", vendorName:"", vendorAddress:"", vendorPan:"", vendorBillRef:"", billDate: new Date().toISOString().slice(0,10), dueDate:"", notes:"" });
       await load();
-      const { data: bill } = await supabase.from("purchase_bills").select("*, purchase_bill_lines(*)").eq("id", billId).single();
-      setPrintBill(bill);
-    } catch(e) { setErr(e.message); }
+      if (mode === "post") {
+        const { data: bill, error } = await supabase
+          .from("purchase_bills")
+          .select("*, purchase_bill_lines(*)")
+          .eq("id", billId)
+          .single();
+        if (error) throw error;
+        setPrintBill(bill);
+      }
+    } catch (error) {
+      setErr(error.message);
+    }
     setBusy(false);
   };
 
-  const filtered = filter === "all" ? bills : bills.filter(b => b.status === filter);
+  const editDraft = (bill) => {
+    setEditingDraftId(bill.id);
+    setForm({
+      fiscalYear: bill.fiscal_year,
+      vendorId: bill.vendor_id || "",
+      vendorName: bill.vendor_name || "",
+      vendorAddress: bill.vendor_address || "",
+      vendorPan: bill.vendor_pan || "",
+      vendorBillRef: bill.vendor_bill_ref || "",
+      billDate: bill.bill_date,
+      dueDate: bill.due_date || "",
+      notes: bill.notes || "",
+    });
+    setLines((bill.purchase_bill_lines || []).map((line) => ({
+      itemId: line.item_id || "",
+      description: line.description || "",
+      quantity: String(line.quantity ?? 1),
+      unit: line.unit || "pcs",
+      rate: String(line.rate ?? 0),
+      vatRate: Number(line.vat_rate ?? VAT_RATE),
+    })));
+    setShowForm(true);
+    setErr(null);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
 
-  const activeBills = bills.filter(b => !["cancelled", "credited"].includes(b.status));
-  const totalOutstanding = activeBills.reduce((s, b) => s + Number(b.outstanding_amount ?? b.total), 0);
-  const totalPaid = activeBills.reduce((s, b) => s + Number(b.amount_paid || 0), 0);
-  const totalVat = activeBills.reduce((s, b) => s + Number(b.vat_amount), 0);
+  const postDraft = async (bill) => {
+    setBusy(true);
+    setErr(null);
+    try {
+      await postBillDraft(bill.id);
+      await load();
+    } catch (error) {
+      setErr(error.message);
+    }
+    setBusy(false);
+  };
 
-    if (payModal) return (
-    <PaymentModal docType="bill" doc={payModal}
-      onClose={()=>setPayModal(null)}
-      onSaved={()=>{setPayModal(null); load();}} />
+  const removeDraft = async (bill) => {
+    setBusy(true);
+    setErr(null);
+    try {
+      await deleteDocumentDraft("bill", bill.id);
+      if (editingDraftId === bill.id) {
+        resetEditor();
+        setShowForm(false);
+      }
+      await load();
+    } catch (error) {
+      setErr(error.message);
+    }
+    setBusy(false);
+  };
+
+  const lifecycleOf = (bill) => bill.document_status || (["cancelled", "credited", "draft"].includes(bill.status) ? bill.status : "posted");
+  const filtered = bills.filter((bill) => {
+    if (filter === "all") return true;
+    if (["draft", "posted", "cancelled", "credited"].includes(filter)) return lifecycleOf(bill) === filter;
+    return bill.status === filter;
+  });
+  const activeBills = bills.filter((bill) => lifecycleOf(bill) === "posted");
+  const totalOutstanding = activeBills.reduce((sum, bill) => sum + Number(bill.outstanding_amount ?? bill.net_total ?? bill.total), 0);
+  const totalPaid = activeBills.reduce((sum, bill) => sum + Number(bill.amount_paid || 0), 0);
+  const totalVat = activeBills.reduce((sum, bill) => sum + Number(bill.vat_amount || 0), 0);
+
+  if (payModal) return (
+    <PaymentModal docType="bill" doc={payModal} onClose={() => setPayModal(null)} onSaved={() => { setPayModal(null); load(); }} />
   );
-
   if (printBill) return <BillPrint bill={printBill} bizName={bizName} profile={profile} onClose={() => setPrintBill(null)} />;
 
   return (
     <div className="panel">
       <div className="panel-head">
         <h2>Purchases (खरिद)</h2>
-        <button className="btn" onClick={() => setShowForm(s=>!s)}>{showForm ? "Cancel" : "+ New Bill"}</button>
+        <button className="btn" onClick={() => {
+          if (showForm) resetEditor();
+          setShowForm((current) => !current);
+        }}>{showForm ? "Close Editor" : "+ New Bill"}</button>
       </div>
 
-      {/* Summary stats */}
       <div className="stat-row">
-        <div className="stat"><span style={{color:"var(--rust)"}}>NPR {totalOutstanding.toLocaleString()}</span>Outstanding Bills</div>
+        <div className="stat"><span style={{ color: "var(--rust)" }}>NPR {totalOutstanding.toLocaleString()}</span>Outstanding Bills</div>
         <div className="stat"><span>NPR {totalPaid.toLocaleString()}</span>Paid Bills</div>
-        <div className="stat"><span>NPR {totalVat.toLocaleString()}</span>Input VAT (claimable)</div>
+        <div className="stat"><span>NPR {totalVat.toLocaleString()}</span>Input VAT</div>
         <div className="stat"><span>{bills.length}</span>Total Bills</div>
       </div>
 
       {showForm && (
-        <form className="inv-form" onSubmit={submit}>
+        <form className="inv-form" onSubmit={(event) => { event.preventDefault(); persist("post"); }}>
+          <b style={{ display: "block", marginBottom: 10 }}>{editingDraftId ? "Edit Purchase Draft" : "New Purchase Bill"}</b>
+          <div className="settings-info-box" style={{ marginBottom: 12 }}>
+            A draft does not change stock or the ledger. Posting is permanent; corrections must use cancellation or a debit note.
+          </div>
           <div className="inv-form-top">
+            <label className="fld">Fiscal Year <input value={form.fiscalYear} onChange={(event) => setForm((current) => ({ ...current, fiscalYear: event.target.value }))} disabled={Boolean(editingDraftId)} /></label>
             <label className="fld">Vendor
-              <select value={form.vendorId} onChange={e=>selectVendor(e.target.value)}>
+              <select value={form.vendorId} onChange={(event) => selectVendor(event.target.value)}>
                 <option value="">Select or type below…</option>
-                {parties.filter(p=>p.party_type==="vendor"||p.party_type==="both").map(p=>(
-                  <option key={p.id} value={p.id}>{p.accounts?.name}</option>
-                ))}
+                {parties.filter((party) => party.party_type === "vendor" || party.party_type === "both").map((party) => <option key={party.id} value={party.id}>{party.accounts?.name}</option>)}
               </select>
             </label>
-            <label className="fld">Vendor Name <input placeholder="Vendor name" value={form.vendorName} onChange={e=>setForm(f=>({...f,vendorName:e.target.value}))} required /></label>
-            <label className="fld">Vendor PAN <input placeholder="PAN/VAT number" value={form.vendorPan} onChange={e=>setForm(f=>({...f,vendorPan:e.target.value}))} /></label>
-            <label className="fld">Vendor Address <input placeholder="Address" value={form.vendorAddress} onChange={e=>setForm(f=>({...f,vendorAddress:e.target.value}))} /></label>
-            <label className="fld">Bill Date <input type="date" value={form.billDate} onChange={e=>setForm(f=>({...f,billDate:e.target.value}))} required /></label>
-            <label className="fld">Due Date <input type="date" value={form.dueDate} onChange={e=>setForm(f=>({...f,dueDate:e.target.value}))} /></label>
-            <label className="fld">Vendor's Bill Ref# <input placeholder="Their invoice number" value={form.vendorBillRef} onChange={e=>setForm(f=>({...f,vendorBillRef:e.target.value}))} /></label>
+            <label className="fld">Vendor Name <input placeholder="Vendor name" value={form.vendorName} onChange={(event) => setForm((current) => ({ ...current, vendorName: event.target.value }))} required /></label>
+            <label className="fld">Vendor PAN <input placeholder="PAN/VAT number" value={form.vendorPan} onChange={(event) => setForm((current) => ({ ...current, vendorPan: event.target.value }))} /></label>
+            <label className="fld">Vendor Address <input placeholder="Address" value={form.vendorAddress} onChange={(event) => setForm((current) => ({ ...current, vendorAddress: event.target.value }))} /></label>
+            <label className="fld">Bill Date <input type="date" value={form.billDate} onChange={(event) => setForm((current) => ({ ...current, billDate: event.target.value }))} required /></label>
+            <label className="fld">Due Date <input type="date" value={form.dueDate} onChange={(event) => setForm((current) => ({ ...current, dueDate: event.target.value }))} /></label>
+            <label className="fld">Vendor Bill Ref# <input placeholder="Their invoice number" value={form.vendorBillRef} onChange={(event) => setForm((current) => ({ ...current, vendorBillRef: event.target.value }))} /></label>
           </div>
 
-          <table className="tbl inv-lines-tbl">
-            <thead><tr><th>Description</th><th>Unit</th><th className="num">Qty</th><th className="num">Rate</th><th className="num">Amount</th><th className="num">VAT%</th><th className="num">VAT</th><th className="num">Total</th><th/></tr></thead>
-            <tbody>
-              {lines.map((l,i)=>(
-                <tr key={i}>
-                  <td>
-                    <select style={{width:"100%",marginBottom:3}} value={l.itemId||""}
-                      onChange={e=>{
-                        const itm = items.find(x=>x.id===e.target.value);
-                        if(itm) updateLine(i,{itemId:itm.id,description:itm.name,unit:itm.unit,rate:String(itm.average_cost || itm.cost_price)});
-                        else updateLine(i,{itemId:"",description:"",unit:"pcs",rate:""});
+          <div style={{ overflowX: "auto" }}>
+            <table className="tbl inv-lines-tbl">
+              <thead><tr><th>Description</th><th>Unit</th><th className="num">Qty</th><th className="num">Rate</th><th className="num">Amount</th><th className="num">VAT%</th><th className="num">VAT</th><th className="num">Total</th><th /></tr></thead>
+              <tbody>
+                {lines.map((line, index) => (
+                  <tr key={index}>
+                    <td>
+                      <select style={{ width: "100%", marginBottom: 3 }} value={line.itemId || ""} onChange={(event) => {
+                        const item = items.find((entry) => entry.id === event.target.value);
+                        if (item) updateLine(index, { itemId: item.id, description: item.name, unit: item.unit, rate: String(item.average_cost || item.cost_price) });
+                        else updateLine(index, { itemId: "", description: "", unit: "pcs", rate: "" });
                       }}>
-                      <option value="">— type below or pick item —</option>
-                      {items.map(itm=>(
-                        <option key={itm.id} value={itm.id}>{itm.name} (Stock: {Number(itm.current_stock).toLocaleString()} {itm.unit})</option>
-                      ))}
-                    </select>
-                    <input placeholder="Description" value={l.description} onChange={e=>updateLine(i,{description:e.target.value})} />
-                  </td>
-                  <td><input placeholder="pcs" value={l.unit} onChange={e=>updateLine(i,{unit:e.target.value})} style={{width:50}} /></td>
-                  <td><input type="number" step="0.001" className="num-input" value={l.quantity} onChange={e=>updateLine(i,{quantity:e.target.value})} /></td>
-                  <td><input type="number" step="0.01" className="num-input" value={l.rate} onChange={e=>updateLine(i,{rate:e.target.value})} /></td>
-                  <td className="num">{calcAmount(l).toLocaleString()}</td>
-                  <td><input type="number" step="0.01" className="num-input" value={l.vatRate} onChange={e=>updateLine(i,{vatRate:e.target.value})} style={{width:55}} /></td>
-                  <td className="num">{calcVat(l).toLocaleString()}</td>
-                  <td className="num">{(calcAmount(l)+calcVat(l)).toLocaleString()}</td>
-                  <td>{lines.length>1&&<button type="button" className="link" onClick={()=>removeLine(i)}>✕</button>}</td>
-                </tr>
-              ))}
-            </tbody>
-            <tfoot>
-              <tr><td colSpan={4} className="muted">Subtotal</td><td className="num"><b>{subtotal.toLocaleString()}</b></td><td></td><td className="num"><b>{vatTotal.toLocaleString()}</b></td><td className="num"><b>{grandTotal.toLocaleString()}</b></td><td/></tr>
-            </tfoot>
-          </table>
+                        <option value="">— type below or pick item —</option>
+                        {items.map((item) => <option key={item.id} value={item.id}>{item.name} (Stock: {Number(item.current_stock).toLocaleString()} {item.unit})</option>)}
+                      </select>
+                      <input placeholder="Description" value={line.description} onChange={(event) => updateLine(index, { description: event.target.value })} />
+                    </td>
+                    <td><input placeholder="pcs" value={line.unit} onChange={(event) => updateLine(index, { unit: event.target.value })} style={{ width: 50 }} /></td>
+                    <td><input type="number" step="0.001" className="num-input" value={line.quantity} onChange={(event) => updateLine(index, { quantity: event.target.value })} /></td>
+                    <td><input type="number" step="0.01" className="num-input" value={line.rate} onChange={(event) => updateLine(index, { rate: event.target.value })} /></td>
+                    <td className="num">{calcAmount(line).toLocaleString()}</td>
+                    <td><input type="number" step="0.01" className="num-input" value={line.vatRate} onChange={(event) => updateLine(index, { vatRate: event.target.value })} style={{ width: 55 }} /></td>
+                    <td className="num">{calcVat(line).toLocaleString()}</td>
+                    <td className="num">{(calcAmount(line) + calcVat(line)).toLocaleString()}</td>
+                    <td>{lines.length > 1 && <button type="button" className="link" onClick={() => removeLine(index)}>✕</button>}</td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot><tr><td colSpan={4} className="muted">Subtotal</td><td className="num"><b>{subtotal.toLocaleString()}</b></td><td /><td className="num"><b>{vatTotal.toLocaleString()}</b></td><td className="num"><b>{grandTotal.toLocaleString()}</b></td><td /></tr></tfoot>
+            </table>
+          </div>
           <button type="button" className="link" onClick={addLine}>+ Add line</button>
-
-          <label className="fld" style={{marginTop:12}}>Notes <input placeholder="Optional notes" value={form.notes} onChange={e=>setForm(f=>({...f,notes:e.target.value}))} /></label>
+          <label className="fld" style={{ marginTop: 12 }}>Printed notes <input placeholder="Optional notes" value={form.notes} onChange={(event) => setForm((current) => ({ ...current, notes: event.target.value }))} /></label>
           {err && <p className="msg err">{err}</p>}
-          <button className="btn" disabled={busy}>{busy?"Saving…":"Save Bill"}</button>
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 10 }}>
+            <button type="button" className="ghost-btn" disabled={busy} onClick={() => persist("draft")}>{busy ? "Saving…" : "Save Draft"}</button>
+            <button className="btn" disabled={busy}>{busy ? "Posting…" : "Post Bill"}</button>
+          </div>
         </form>
       )}
 
-      {/* Filter tabs */}
       <div className="filter-tabs">
-        {["all","open","partial","overdue","paid","cancelled","credited"].map(f=>(
-          <button key={f} className={"filter-tab"+(filter===f?" active":"")} onClick={()=>setFilter(f)}>
-            {f.charAt(0).toUpperCase()+f.slice(1)}
-          </button>
+        {["all", "draft", "posted", "open", "partial", "overdue", "paid", "credited", "cancelled"].map((value) => (
+          <button key={value} className={`filter-tab${filter === value ? " active" : ""}`} onClick={() => setFilter(value)}>{value.charAt(0).toUpperCase() + value.slice(1)}</button>
         ))}
       </div>
 
-      {loading ? <p className="note">Loading…</p> : filtered.length === 0 ? (
-        <p className="note">No bills found.</p>
-      ) : (
-        <table className="tbl" style={{marginTop:8}}>
-          <thead><tr><th>Bill #</th><th>Date</th><th>Due</th><th>Vendor</th><th>Status</th><th className="num">Paid</th><th className="num">Outstanding</th><th className="num">Total</th><th/></tr></thead>
-          <tbody>
-            {filtered.map(b=>(
-              <tr key={b.id}>
-                <td>{b.fiscal_year}-PB-{String(b.bill_number).padStart(4,"0")}</td>
-                <td>{b.bill_date}</td>
-                <td className={b.status === "overdue" ? "overdue" : ""}>{b.due_date||"—"}</td>
-                <td>{b.vendor_name}</td>
-                <td><span className={"status-"+b.status}>{b.status}</span>{["partial", "overdue"].includes(b.status) && <div style={{fontSize:10,color:"var(--rust)",marginTop:2}}>Paid NPR {Number(b.amount_paid||0).toLocaleString()}</div>}</td>
-                <td className="num">NPR {Number(b.amount_paid || 0).toLocaleString()}</td>
-                <td className="num"><b>NPR {Number(b.outstanding_amount ?? b.total).toLocaleString()}</b></td>
-                <td className="num">NPR {Number(b.total).toLocaleString()}</td>
-                <td>
-                  <button className="link" onClick={()=>setPrintBill(b)}>View</button>
-                  {(["open", "partial", "overdue"].includes(b.status)) && (
-                    <button className="link" onClick={()=>setPayModal(b)}>
-                      {Number(b.amount_paid || 0) > 0 ? "Record More Payment" : "Record Payment"}
-                    </button>
-                  )}
-                  {b.status==="open" && Number(b.amount_paid || 0) === 0 && <button className="link" style={{color:"var(--rust)"}} onClick={async()=>{await updateBillStatus(b.id,"cancelled");load();}}>Cancel</button>}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      {err && !showForm && <p className="msg err">{err}</p>}
+      {loading ? <p className="note">Loading…</p> : filtered.length === 0 ? <p className="note">No bills found.</p> : (
+        <div style={{ overflowX: "auto", marginTop: 8 }}>
+          <table className="tbl">
+            <thead><tr><th>Bill #</th><th>Date</th><th>Vendor</th><th>Lifecycle</th><th>Payment</th><th className="num">Paid</th><th className="num">Outstanding</th><th className="num">Net / Original</th><th /></tr></thead>
+            <tbody>
+              {filtered.map((bill) => {
+                const lifecycle = lifecycleOf(bill);
+                return (
+                  <tr key={bill.id}>
+                    <td>{bill.fiscal_year}-PB-{String(bill.bill_number).padStart(4, "0")}</td>
+                    <td>{bill.bill_date}</td>
+                    <td>{bill.vendor_name}</td>
+                    <td><span className={`status-${lifecycle}`}>{lifecycle}</span></td>
+                    <td>{lifecycle === "posted" ? <span className={`status-${bill.status}`}>{bill.status}</span> : "—"}</td>
+                    <td className="num">NPR {Number(bill.amount_paid || 0).toLocaleString()}</td>
+                    <td className="num"><b>NPR {Number(bill.outstanding_amount || 0).toLocaleString()}</b></td>
+                    <td className="num"><b>NPR {Number(bill.net_total ?? bill.total).toLocaleString()}</b>{Number(bill.credited_amount || 0) > 0 && <div className="muted" style={{ fontSize: 10 }}>Original {Number(bill.total).toLocaleString()}</div>}</td>
+                    <td style={{ whiteSpace: "nowrap" }}>
+                      {lifecycle !== "draft" && <button className="link" onClick={() => setPrintBill(bill)}>View</button>}
+                      <button className="link" onClick={() => setActivityDoc(bill)}>Activity</button>
+                      {lifecycle === "draft" && <>
+                        <button className="link" onClick={() => editDraft(bill)}>Edit</button>
+                        <button className="link" onClick={() => postDraft(bill)} disabled={busy}>Post</button>
+                        <button className="link" style={{ color: "var(--rust)" }} onClick={() => removeDraft(bill)} disabled={busy}>Delete</button>
+                      </>}
+                      {lifecycle === "posted" && ["open", "partial", "overdue"].includes(bill.status) && <button className="link" onClick={() => setPayModal(bill)}>{Number(bill.amount_paid || 0) > 0 ? "More Payment" : "Record Payment"}</button>}
+                      {lifecycle === "posted" && Number(bill.amount_paid || 0) === 0 && Number(bill.credited_amount || 0) === 0 && <button className="link" style={{ color: "var(--rust)" }} onClick={() => setCancelDoc(bill)}>Cancel</button>}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {activityDoc && <DocumentActivityModal documentType="bill" document={activityDoc} title={`Bill ${activityDoc.fiscal_year}-PB-${String(activityDoc.bill_number).padStart(4, "0")}`} onClose={() => setActivityDoc(null)} />}
+      {cancelDoc && (
+        <LifecycleActionModal
+          title={`Cancel Bill #${cancelDoc.bill_number}`}
+          description="This posts a reversing payable, VAT, purchase, and inventory voucher. Cancellation fails when returned stock is no longer available."
+          actionLabel="Cancel & Reverse"
+          onClose={() => setCancelDoc(null)}
+          onConfirm={async (reason, date) => {
+            await cancelBillDocument(cancelDoc.id, reason, date);
+            await load();
+          }}
+        />
       )}
     </div>
   );

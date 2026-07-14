@@ -38,7 +38,7 @@ async function fetchInvoices() {
   const { data, error } = await supabase
     .from("invoices")
     .select("*")
-    .neq("status", "cancelled");
+    .eq("document_status", "posted");
   if (error) throw error;
   return data;
 }
@@ -47,7 +47,7 @@ async function fetchBills() {
   const { data, error } = await supabase
     .from("purchase_bills")
     .select("*")
-    .neq("status", "cancelled");
+    .eq("document_status", "posted");
   if (error) throw error;
   return data;
 }

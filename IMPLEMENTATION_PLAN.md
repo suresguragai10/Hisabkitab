@@ -14,7 +14,7 @@ This plan converts the product audit into small releases. Each stage should be c
 
 ## Stage 1 — Restore manual vouchers
 
-Status: **started in this revision**
+Status: **completed in the Stage 1 remediation**
 
 1. Replace the duplicate Voucher Entry page with a real double-entry form.
 2. Support Journal, Payment, Receipt, and Contra vouchers.
@@ -48,7 +48,7 @@ Status: **started in this revision**
 
 ## Stage 2 — Make payments accurate
 
-Status: **implemented in v6.1.0; database acceptance completed**
+Status: **implemented in v6.1.0; owner applied and verified the migration**
 
 1. Add `document_payments` and `payment_allocations` tables.
 2. Store every receipt and payment separately.
@@ -62,7 +62,7 @@ Status: **implemented in v6.1.0; database acceptance completed**
 
 ## Stage 3 — Correct inventory accounting
 
-Status: **core perpetual inventory implemented in v6.2.0; source/build checks passed; staging acceptance required**
+Status: **implemented in v6.2.0; owner applied the migration and pushed the repository**
 
 1. Choose and document the inventory method: perpetual inventory is recommended.
 2. Add Inventory Asset, Cost of Goods Sold, Stock Adjustment, and Purchase Return accounts.
@@ -71,11 +71,12 @@ Status: **core perpetual inventory implemented in v6.2.0; source/build checks pa
 5. On purchase: debit Inventory Asset rather than Purchase Expense for stock items.
 6. Handle sales returns, purchase returns, damaged stock, and opening stock.
 7. Reconcile stock valuation to the Inventory Asset ledger.
-8. Enforce a valuation cutover date and reject backdated movements that would invalidate moving-average history.
 
 **Exit condition:** stock valuation equals the related general-ledger balance.
 
 ## Stage 4 — Rebuild document lifecycle
+
+Status: **implemented in v6.3.0 source; staging migration and acceptance are pending**
 
 1. Separate Draft, Posted, Cancelled, and Credited documents.
 2. Prohibit editing a posted financial document directly.
@@ -152,4 +153,4 @@ Every report should support date range, fiscal year, export, drill-down, and tot
 
 ## Immediate next development task
 
-Apply and accept the Stage 3 migration in staging. After the stock-to-ledger reconciliation and weighted-average acceptance test pass, proceed to **Stage 4: controlled document lifecycle and complete credit/debit-note returns**.
+First apply and accept the Stage 4 migration in staging using its preflight, verification, and lifecycle/return tests. After Stage 4 acceptance, implement **Stage 5: structured Chart of Accounts** so financial statements use stable report classifications rather than account-name text.

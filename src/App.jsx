@@ -698,6 +698,7 @@ function Style() {
   .inv-form-top{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px}
   .inv-lines-tbl input{font-size:13px;padding:6px 8px}
   .status-draft{color:#9a9483}
+  .status-posted{color:var(--green2);font-weight:700}
   .status-sent,.status-open{color:var(--gold)}
   .status-partial{color:#a66b00;font-weight:700}
   .status-overdue{color:var(--rust);font-weight:700}

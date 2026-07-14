@@ -1,51 +1,63 @@
 # HisabKitab
 
-HisabKitab is a React and Supabase prototype for Nepal-focused cloud accounting. It includes invoicing, purchases, inventory, double-entry vouchers, ledgers, reports, tax-related screens, team features, and Bikram Sambat date support.
+HisabKitab is a React 18, Vite, Supabase, and PostgreSQL accounting prototype for Nepal-focused businesses. It includes invoicing, purchases, inventory, double-entry vouchers, ledgers, reports, tax-related screens, team features, and Bikram Sambat date support.
 
 ## Product status
 
-The project is under active correction and is **not yet ready for production bookkeeping**. Some visible modules still need complete database migrations and accounting-integrity work. Review these files before deployment:
+Version **6.3.0** contains the source implementation through Stage 4 of the remediation plan. It remains a **development prototype** and is not approved for production bookkeeping or statutory reliance. Complete staging migration, acceptance, reconciliation, role/RLS, report, tax, backup, and professional accounting review gates before using real business data.
 
-- `IMPLEMENTATION_PLAN.md` — ordered improvement and release plan
-- `PRODUCT_AUDIT.md` — source-code and accounting audit
-- `hisabkitab-erp-roadmap.md` — original feature roadmap
+Review these files before deployment:
 
-## Included remediation stages
+- `IMPLEMENTATION_PLAN.md` — ordered release plan
+- `PRODUCT_AUDIT.md` — accounting, security, UI, and technical audit
+- `STAGE2_IMPLEMENTATION_NOTES.md` — payment allocations
+- `STAGE3_IMPLEMENTATION_NOTES.md` — perpetual inventory and COGS
+- `STAGE4_IMPLEMENTATION_NOTES.md` — document lifecycle, reversals, and notes
 
-### Stage 1 — Manual vouchers
+## Implemented remediation stages
 
-- Balanced Journal, Payment, Receipt, and Contra vouchers
-- Atomic posting, ownership validation, safer numbering, and controlled voiding
+### Stage 1 — manual vouchers
 
-### Stage 2 — Payment allocations
+- Journal, Payment, Receipt, and Contra entry
+- Multi-line balanced posting in one PostgreSQL transaction
+- Account ownership checks and safer numbering
+- Controlled voiding of manual vouchers
 
-- Separate payment and allocation records
-- Accurate partial-payment, paid, overdue, and outstanding balances
-- Payment history and controlled allocation reversals
+### Stage 2 — payment allocations
 
-### Stage 3 — Perpetual inventory
+- Separate payments and document allocations
+- Open, Partial, Paid, and Overdue balances derived from allocations
+- Over-allocation prevention and controlled payment-allocation reversal
+- Payment history on invoices and bills
 
-- Moving weighted-average valuation
-- Tracked purchases debit Inventory Asset
-- Tracked sales debit COGS and credit Inventory Asset
-- Valued opening stock and damage/shrinkage adjustments
-- Stock ledger with quantity/value balances
-- Live reconciliation of stock valuation to the Inventory Asset ledger
-- Inventory cutover-date and chronological movement controls
+### Stage 3 — inventory and COGS
 
-## Database setup
+- Perpetual inventory with moving weighted-average cost
+- Inventory Asset and Cost of Goods Sold posting
+- Purchase, sale, opening stock, damage, and adjustment valuation
+- Stock valuation versus Inventory Asset reconciliation
 
-Use a separate staging Supabase project first. Apply the existing SQL files in their intended phase order, then apply the remediation migrations in order:
+### Stage 4 — document lifecycle
+
+- Separate Draft, Posted, Cancelled, and Credited lifecycle states
+- Editable drafts and immutable posted invoice/bill identities
+- Controlled source-document and note cancellation vouchers
+- Source links and reversal links on generated vouchers
+- Immutable invoice, bill, credit-note, and debit-note numbering by fiscal year
+- Sales credit notes and purchase debit notes with VAT, party, stock, and COGS posting
+- Private document attachments and internal notes
+
+## Database application order
+
+Use a separate staging Supabase project and create a backup first. Apply the accepted baseline migrations in their documented order. For the latest changes, run:
 
 ```text
-sql/phaseP0_1_manual_vouchers.sql
-sql/phaseP0_2_payment_allocations.sql
-sql/phaseP0_3_inventory_cogs.sql
+sql/phaseP0_4_document_lifecycle_preflight.sql
+sql/phaseP0_4_document_lifecycle.sql
+sql/phaseP0_4_document_lifecycle_verify.sql
 ```
 
-Run `sql/phaseP0_3_inventory_cogs_preflight.sql` before Stage 3, then run each matching verification script after its migration. Stage 3 initializes existing quantities and values but does not automatically post a catch-up journal; review the Inventory reconciliation in staging first.
-
-Do not apply migrations directly to production without a database backup and a staging test.
+Every preflight result labelled missing, duplicate, or blocking should be resolved before the main migration. Review every verification result and complete the acceptance tests in `STAGE4_IMPLEMENTATION_NOTES.md` before production scheduling.
 
 ## Run locally
 
@@ -54,7 +66,7 @@ npm install
 npm run dev
 ```
 
-Vite prints the local development URL, normally `http://localhost:5173`.
+Vite normally prints `http://localhost:5173`.
 
 ## Build
 
@@ -62,24 +74,14 @@ Vite prints the local development URL, normally `http://localhost:5173`.
 npm run build
 ```
 
-The compiled application is written to `dist/`.
+The compiled application is written to `dist/`. The current build succeeds; Vite still warns that the main bundle is larger than 500 kB. Route-level code splitting remains a later UI/engineering task.
 
-The current build succeeds, although Vite reports that the main JavaScript bundle is larger than 500 kB. Route-based code splitting is included later in the implementation plan.
+## Configuration and security
 
-## Configuration
+Supabase browser configuration is in `src/config.js`. Use only the project URL and a browser-safe publishable/anon key. Never place a service-role key, database password, SMTP password, or deployment token in the frontend bundle.
 
-Supabase configuration currently lives in `src/config.js`. Use environment variables and separate credentials for development, staging, and production before a commercial release.
-
-## Stage 3 verification
-
-After applying the Stage 3 migration, run:
-
-```text
-sql/phaseP0_3_inventory_cogs_verify.sql
-```
-
-Then complete the weighted-average purchase, sale, damage, and reconciliation test in `STAGE3_IMPLEMENTATION_NOTES.md`.
+Use separate development, staging, and production projects. Do not apply migrations directly to production without a verified backup and rollback procedure.
 
 ## Next priority
 
-Stage 4 will add controlled posted-document cancellation/reversal and complete credit/debit-note return workflows. Full returns must not be simulated with a manual stock adjustment because VAT and receivable/payable balances must reverse with the stock.
+After Stage 4 is migrated and accepted in staging, proceed to **Stage 5: structured Chart of Accounts**. Reports must stop depending on account display-name strings.

@@ -18,8 +18,8 @@ async function fetchStats() {
 
 async function fetchRecentActivity() {
   const [invRes, voucherRes] = await Promise.all([
-    supabase.from("invoices").select("id,invoice_number,fiscal_year,invoice_date,party_name,total,status")
-      .neq("status","cancelled").order("invoice_date",{ascending:false}).limit(5),
+    supabase.from("invoices").select("id,invoice_number,fiscal_year,invoice_date,party_name,total,net_total,status,document_status")
+      .eq("document_status","posted").order("invoice_date",{ascending:false}).limit(5),
     supabase.from("vouchers").select("id,voucher_type,voucher_number,voucher_date,narration")
       .eq("is_void",false).order("voucher_date",{ascending:false}).limit(5),
   ]);
