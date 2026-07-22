@@ -54,6 +54,7 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [session, setSession] = useState(null);
   const [needsPassword, setNeedsPassword] = useState(false);
+  const [recoveryPending, setRecoveryPending] = useState(false);
   const [lang, setLangState] = useState(getLang());
 
   const toggleLang = () => {
@@ -73,7 +74,7 @@ export default function App() {
     const { data: sub } = supabase.auth.onAuthStateChange((_event, s) => {
       setSession(s);
       if (s) checkNeedsPassword(s);
-      else { setLoading(false); setNeedsPassword(false); }
+      else { setLoading(false); setNeedsPassword(false); setRecoveryPending(false); }
     });
     return () => sub.subscription.unsubscribe();
   }, []);
@@ -94,8 +95,15 @@ export default function App() {
   };
 
   if (loading) return <Splash />;
-  if (!session) return <Login />;
-  if (needsPassword) return <SetPassword onDone={onPasswordSet} />;
+  if (!session) return <Login onRecoveryPendingChange={setRecoveryPending} />;
+  if (needsPassword || recoveryPending) {
+    return (
+      <SetPassword
+        recovery={recoveryPending}
+        onDone={() => { setRecoveryPending(false); onPasswordSet(); }}
+      />
+    );
+  }
   return <Authed session={session} lang={lang} toggleLang={toggleLang} />;
 }
 
@@ -168,7 +176,7 @@ async function authErrorMessage(error) {
 }
 
 // ── Login — email+password with OTP fallback ──────────────────
-function Login() {
+function Login({ onRecoveryPendingChange }) {
   const [mode, setMode] = useState("password"); // 'password' | 'otp' | 'forgot'
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -233,6 +241,7 @@ function Login() {
     const { error } = await supabase.auth.signInWithOtp({ email: e, options: { shouldCreateUser: false } });
     setBusy(false);
     if (error) { setErr(await authErrorMessage(error)); return; }
+    onRecoveryPendingChange?.(true);
     setStep("code");
     setMsg("Reset code sent to " + e + ". Enter it to log in, then set a new password.");
   };
@@ -310,7 +319,7 @@ function Login() {
             <button className="btn full" onClick={sendReset} disabled={busy}>
               {busy ? "Sending…" : "Send reset code"}
             </button>
-            <button className="link" onClick={() => { setMode("password"); reset(); }}>← Back to sign in</button>
+            <button className="link" onClick={() => { onRecoveryPendingChange?.(false); setMode("password"); reset(); }}>← Back to sign in</button>
           </>
         )}
         {mode === "forgot" && step === "code" && (
@@ -335,7 +344,7 @@ function Login() {
 }
 
 // ── Set Password — shown after first OTP login ────────────────
-function SetPassword({ onDone }) {
+function SetPassword({ onDone, recovery = false }) {
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [busy, setBusy] = useState(false);
@@ -362,8 +371,12 @@ function SetPassword({ onDone }) {
       <Style />
       <div className="card">
         <div className="logo"><span>हिसाब</span>HisabKitab</div>
-        <h2 style={{marginTop:16,marginBottom:4}}>Set your password</h2>
-        <p className="sub">You only do this once. Next time you can log in with email + password directly.</p>
+        <h2 style={{marginTop:16,marginBottom:4}}>{recovery ? "Set New Password" : "Set your password"}</h2>
+        <p className="sub">
+          {recovery
+            ? "Enter a new password to finish resetting your account."
+            : "You only do this once. Next time you can log in with email + password directly."}
+        </p>
         {ok ? (
           <p className="msg ok">✓ Password saved! Taking you to your books…</p>
         ) : (
@@ -381,7 +394,7 @@ function SetPassword({ onDone }) {
             <button className="btn full" onClick={save} disabled={busy}>
               {busy ? "Saving…" : "Set password & continue"}
             </button>
-            <button className="link" onClick={onDone}>Skip for now</button>
+            {!recovery && <button className="link" onClick={onDone}>Skip for now</button>}
           </>
         )}
       </div>
