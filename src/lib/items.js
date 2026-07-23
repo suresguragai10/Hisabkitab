@@ -27,18 +27,15 @@ export async function createCategory({ name, nameNp = null, parentId = null, not
 }
 
 export async function updateCategory(id, patch) {
-  const { error } = await supabase
-    .from("item_categories")
-    .update({
-      ...(patch.name       !== undefined && { name: patch.name }),
-      ...(patch.nameNp     !== undefined && { name_np: patch.nameNp }),
-      ...(patch.parentId   !== undefined && { parent_id: patch.parentId }),
-      ...(patch.sortOrder  !== undefined && { sort_order: patch.sortOrder }),
-      ...(patch.notes      !== undefined && { notes: patch.notes }),
-      ...(patch.isActive   !== undefined && { is_active: patch.isActive }),
-      updated_at: new Date().toISOString(),
-    })
-    .eq("id", id);
+  const { error } = await supabase.rpc("update_item_category", {
+    p_id: id,
+    p_name: patch.name ?? null,
+    p_name_np: patch.nameNp ?? null,
+    p_parent_id: patch.parentId ?? null,
+    p_sort_order: patch.sortOrder !== undefined ? Number(patch.sortOrder) : null,
+    p_notes: patch.notes ?? null,
+    p_is_active: patch.isActive ?? null,
+  });
   if (error) throw error;
 }
 
