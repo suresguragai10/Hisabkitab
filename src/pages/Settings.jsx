@@ -83,11 +83,24 @@ export default function Settings() {
   };
 
   const toggleLock = async (period) => {
-    setBusy(true); setErr(null);
+    setErr(null);
+    // A period can be reopened, but never silently -- a reason is
+    // always attached to the unlock so a closed-fiscal-year or
+    // filed-VAT-return period is protected, and there's a record of
+    // why it was reopened.
+    let reason = null;
+    if (period.is_locked) {
+      const input = window.prompt(`Reason for reopening "${period.period_label}"?`);
+      if (input === null) return; // user cancelled
+      reason = input.trim() || null;
+    }
+
+    setBusy(true);
     try {
       const { error } = await supabase.rpc("set_period_lock", {
         p_period_id: period.id,
         p_locked: !period.is_locked,
+        p_reason: reason,
       });
       if (error) throw error;
       setMsg(`Period "${period.period_label}" ${!period.is_locked ? "locked 🔒" : "unlocked 🔓"}`);
@@ -101,7 +114,7 @@ export default function Settings() {
     setBusy(true); setErr(null);
     try {
       for (const p of periods.filter(p => !p.is_locked)) {
-        await supabase.rpc("set_period_lock", { p_period_id: p.id, p_locked: true });
+        await supabase.rpc("set_period_lock", { p_period_id: p.id, p_locked: true, p_reason: null });
       }
       setMsg(`All periods in ${fiscalYear} locked.`);
       await loadPeriods();
