@@ -160,17 +160,14 @@ export default function BankReconciliation() {
     if (!stmtForm.fromDate || !stmtForm.toDate) { setErr("Enter date range."); return; }
     setBusy(true); setErr(null);
     try {
-      const acct = bankAccounts.find(a=>a.id===stmtForm.accountId);
-      const { data, error } = await supabase.from("bank_statements").insert({
-        user_id:         (await supabase.auth.getUser()).data.user.id,
-        account_id:      stmtForm.accountId,
-        account_name:    acct?.name || "",
-        from_date:       stmtForm.fromDate,
-        to_date:         stmtForm.toDate,
-        opening_balance: parseFloat(stmtForm.openingBalance)||0,
-        closing_balance: parseFloat(stmtForm.closingBalance)||0,
-        notes:           stmtForm.notes.trim()||null,
-      }).select().single();
+      const { data, error } = await supabase.rpc("create_bank_statement", {
+        p_account_id:      stmtForm.accountId,
+        p_from_date:       stmtForm.fromDate,
+        p_to_date:         stmtForm.toDate,
+        p_opening_balance: parseFloat(stmtForm.openingBalance)||0,
+        p_closing_balance: parseFloat(stmtForm.closingBalance)||0,
+        p_notes:           stmtForm.notes.trim()||null,
+      });
       if (error) throw error;
       setShowNewStmt(false);
       await load();
@@ -186,15 +183,14 @@ export default function BankReconciliation() {
     if (dep===0 && wit===0) { setErr("Enter deposits or withdrawals amount."); return; }
     setBusy(true); setErr(null);
     try {
-      const { error } = await supabase.from("bank_statement_lines").insert({
-        statement_id: activeStmt.id,
-        user_id: (await supabase.auth.getUser()).data.user.id,
-        txn_date:     lineForm.txnDate,
-        description:  lineForm.description.trim(),
-        reference:    lineForm.reference.trim()||null,
-        deposits:     dep,
-        withdrawals:  wit,
-        balance:      parseFloat(lineForm.balance)||null,
+      const { error } = await supabase.rpc("add_bank_statement_line", {
+        p_statement_id: activeStmt.id,
+        p_txn_date:     lineForm.txnDate,
+        p_description:  lineForm.description.trim(),
+        p_reference:    lineForm.reference.trim()||null,
+        p_deposits:     dep,
+        p_withdrawals:  wit,
+        p_balance:      parseFloat(lineForm.balance)||null,
       });
       if (error) throw error;
       setLineForm({txnDate:new Date().toISOString().slice(0,10),description:"",reference:"",deposits:"",withdrawals:"",balance:""});
@@ -210,16 +206,17 @@ export default function BankReconciliation() {
     if (validRows.length === 0) { setErr("No valid rows found. Format: Date, Description, Withdrawals, Deposits, Balance"); return; }
     setBusy(true); setErr(null);
     try {
-      const uid = (await supabase.auth.getUser()).data.user.id;
-      const inserts = validRows.map(r=>({
-        statement_id: activeStmt.id, user_id: uid,
+      const lines = validRows.map(r=>({
         txn_date:    new Date(r[0]).toISOString().slice(0,10),
         description: r[1]||"",
         withdrawals: parseFloat(r[2])||0,
         deposits:    parseFloat(r[3])||0,
         balance:     r[4] ? parseFloat(r[4])||null : null,
       }));
-      const { error } = await supabase.from("bank_statement_lines").insert(inserts);
+      const { error } = await supabase.rpc("import_bank_statement_lines", {
+        p_statement_id: activeStmt.id,
+        p_lines: lines,
+      });
       if (error) throw error;
       setCsvText(""); setShowCsv(false);
       await loadLines(activeStmt);
