@@ -1,32 +1,45 @@
 import React, { useEffect, useState } from "react";
 import { supabase } from "../supabase";
 import { currentFiscalYear } from "../lib/fiscalYear";
+import { bsToAd, BS_MONTHS_EN } from "../lib/nepaliCalendar";
 import { useWorkspace } from "../lib/workspace";
 
 // ── Nepal fiscal year months (Shrawan start) ─────────────────
-// Approximate AD date ranges for each BS month in the fiscal year
-// BS 2081/82 = 2024-07-17 to 2025-07-15 (typical)
-const NEPALI_MONTHS = [
-  "Shrawan","Bhadra","Ashwin","Kartik","Mangsir","Poush",
-  "Magh","Falgun","Chaitra","Baishakh","Jestha","Ashadh"
-];
-
+// Fiscal year runs Shrawan (BS month index 3) through Ashadh
+// (BS month index 2 of the following BS year). Real day-accurate
+// AD dates come from nepaliCalendar.js (bsToAd), which is built
+// from a verified table of days-per-BS-month — no more 30.5-day
+// approximation, which could land a period boundary a day or two
+// off the real Nepali month.
 function generatePeriods(fiscalYear) {
-  // Parse "2081/82" to get BS year
-  const bsYear = parseInt(fiscalYear.split("/")[0]);
-  // Each period is a BS month; approximate AD dates
-  // Shrawan 2081 ≈ 2024-07-17 to 2024-08-16
-  // We use approximate 30-day months; the exact mapping is in nepaliCalendar
-  // For period locks, approximate dates are fine — the check is by stored from/to
-  const base = new Date(2024, 6, 17); // approx Shrawan 1 = Jul 17 2024 for 2081
-  const yearOffset = bsYear - 2081;
-  const startMs = base.getTime() + yearOffset * 365.25 * 24 * 3600 * 1000;
+  // Accept either "2081-82" (the format currentFiscalYear() actually
+  // produces) or the older "2081/82" separator, in case one is typed.
+  const fyStartYear = parseInt(String(fiscalYear).split(/[-/]/)[0], 10);
+  if (!Number.isFinite(fyStartYear)) {
+    throw new Error(`Unrecognized fiscal year format: "${fiscalYear}". Expected e.g. "2081-82".`);
+  }
 
-  return NEPALI_MONTHS.map((name, i) => {
-    const from = new Date(startMs + i * 30.5 * 24 * 3600 * 1000);
-    const to   = new Date(startMs + (i+1) * 30.5 * 24 * 3600 * 1000 - 24 * 3600 * 1000);
+  const sequence = [];
+  for (let m = 3; m <= 11; m++) sequence.push({ year: fyStartYear, month: m });
+  for (let m = 0; m <= 2; m++) sequence.push({ year: fyStartYear + 1, month: m });
+
+  return sequence.map(({ year, month }, i) => {
+    // The last entry (Ashadh, month index 2) is followed by Shrawan
+    // (month index 3) of the SAME BS year as that Ashadh — i.e.
+    // fyStartYear + 1, not + 2. BS month order within one BS year is
+    // Baishakh(0)..Chaitra(11), so index 2 -> 3 never crosses a BS
+    // year boundary; only Chaitra(11) -> Baishakh(0) does, and that
+    // case is already produced naturally by the sequence array above.
+    const next = sequence[i + 1] || { year: fyStartYear + 1, month: 3 };
+    const from = bsToAd(year, month, 1);
+    const nextStart = bsToAd(next.year, next.month, 1);
+    if (!from || !nextStart) {
+      throw new Error(`Nepali calendar data is not available for BS year ${year}. Check nepaliCalendar.js coverage.`);
+    }
+    const to = new Date(nextStart);
+    to.setDate(to.getDate() - 1);
     return {
-      label:     `${name} ${bsYear + (i >= 9 ? 1 : 0)}`,
+      label:     `${BS_MONTHS_EN[month]} ${year}`,
       from_date: from.toISOString().slice(0,10),
       to_date:   to.toISOString().slice(0,10),
     };
@@ -83,11 +96,23 @@ export default function Settings() {
   };
 
   const toggleLock = async (period) => {
-    setBusy(true); setErr(null);
+    setErr(null);
+    let reason = null;
+
+    // Reopening a locked period must always have a reason on record.
+    if (period.is_locked) {
+      const input = window.prompt(`Reason for reopening "${period.period_label}"? (required)`);
+      if (input === null) return; // user cancelled
+      reason = input.trim();
+      if (!reason) { setErr("A reason is required to reopen a locked period."); return; }
+    }
+
+    setBusy(true);
     try {
       const { error } = await supabase.rpc("set_period_lock", {
         p_period_id: period.id,
         p_locked: !period.is_locked,
+        p_reason: reason,
       });
       if (error) throw error;
       setMsg(`Period "${period.period_label}" ${!period.is_locked ? "locked 🔒" : "unlocked 🔓"}`);
@@ -135,7 +160,7 @@ export default function Settings() {
             <label className="fld" style={{margin:0,flex:"0 0 160px"}}>
               Fiscal Year
               <input value={fiscalYear} onChange={e=>setFiscalYear(e.target.value)}
-                placeholder="e.g. 2081/82" style={{marginTop:4}} />
+                placeholder="e.g. 2081-82" style={{marginTop:4}} />
             </label>
             {canEdit && periods.length === 0 && (
               <button className="btn" style={{marginTop:20}} onClick={generatePeriodRows} disabled={busy}>
@@ -153,9 +178,11 @@ export default function Settings() {
           {!canEdit && <p className="note">Only owner or accountant can manage period locks.</p>}
 
           <div className="settings-info-box">
-            <b>What period locks do:</b> Once a period is locked, no new vouchers, invoices or bills
-            can be posted with a date inside that period. This prevents backdating after VAT filing
-            or year-end close. Unlock to make a correction, then re-lock.
+            <b>What period locks do:</b> Once a period is locked, nothing dated inside it can be
+            created, edited, or deleted — this prevents backdating after VAT filing or year-end
+            close, and is enforced by the database itself, not just this screen. Reopening a locked
+            period requires a reason, which is permanently recorded along with who reopened it and
+            when.
           </div>
 
           {loadingP ? <p className="note">Loading…</p> :
