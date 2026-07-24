@@ -4,6 +4,7 @@ import { supabase } from "../supabase";
 import { currentFiscalYear } from "../lib/fiscalYear";
 import { formatDualDate, todayLocalDate } from "../lib/nepaliCalendar";
 import { listParties } from "../lib/db";
+import { useBusinessProfile } from "../lib/businessProfile";
 
 // TDS types are loaded from the database via useTaxRates()
 
@@ -25,7 +26,7 @@ async function listRemittances() {
 }
 
 // ── TDS Certificate print view ─────────────────────────────────
-function TDSCertificate({ entries, payeeName, onClose }) {
+function TDSCertificate({ entries, payeeName, onClose, tdsTypes, bizProfile }) {
   const totGross = entries.reduce((s,e) => s+Number(e.gross_amount),0);
   const totTds   = entries.reduce((s,e) => s+Number(e.tds_amount),0);
   const totNet   = entries.reduce((s,e) => s+Number(e.net_amount),0);
@@ -46,8 +47,8 @@ function TDSCertificate({ entries, payeeName, onClose }) {
           </div>
           <div style={{textAlign:"right",fontSize:12}}>
             <div><b>Deductor (कट्टा गर्ने):</b></div>
-            <div>Your Business Name</div>
-            <div style={{color:"#888"}}>PAN: —</div>
+            <div>{bizProfile?.biz_name || "—"}</div>
+            <div style={{color:"#888"}}>PAN: {bizProfile?.pan_vat || "—"}</div>
           </div>
         </div>
 
@@ -77,7 +78,7 @@ function TDSCertificate({ entries, payeeName, onClose }) {
             {entries.map(e=>(
               <tr key={e.id}>
                 <td style={{fontSize:11}}>{e.entry_date}</td>
-                <td style={{fontSize:11}}>{TDS_TYPES.find(t=>t.type===e.tds_type)?.label||e.tds_type}</td>
+                <td style={{fontSize:11}}>{tdsTypes.find(t=>t.type===e.tds_type)?.label||e.tds_type}</td>
                 <td style={{fontSize:11}}>{e.reference||"—"}</td>
                 <td className="r">{fmt(e.gross_amount)}</td>
                 <td className="r">{e.tds_rate}%</td>
@@ -116,6 +117,7 @@ function TDSCertificate({ entries, payeeName, onClose }) {
 // ── Main TDS page ─────────────────────────────────────────────
 export default function TDS({ userId }) {
   const { tdsTypes: TDS_TYPES } = useTaxRates(); // from DB, falls back to statutory rates
+  const { profile: bizProfile } = useBusinessProfile();
   const [entries,     setEntries]     = useState([]);
   const [remittances, setRemittances] = useState([]);
   const [parties,     setParties]     = useState([]);
@@ -235,7 +237,8 @@ export default function TDS({ userId }) {
   const totalRemitted = entries.filter(e=>e.status==="remitted").reduce((s,e)=>s+Number(e.tds_amount),0);
 
   if (certEntries) return (
-    <TDSCertificate entries={certEntries} payeeName={certPayee} onClose={()=>setCertEntries(null)} />
+    <TDSCertificate entries={certEntries} payeeName={certPayee} onClose={()=>setCertEntries(null)}
+      tdsTypes={TDS_TYPES} bizProfile={bizProfile} />
   );
 
   return (

@@ -30,6 +30,7 @@ class TabErrorBoundary extends Component {
 import Dashboard from "./pages/Dashboard";
 import TeamMembers from "./pages/TeamMembers";
 import TDS from "./pages/TDS";
+import VatFiling from "./pages/VatFiling";
 import BankReconciliation from "./pages/BankReconciliation";
 import Settings from "./pages/Settings";
 import CreditDebitNotes from "./pages/CreditDebitNotes";
@@ -433,6 +434,7 @@ const NAV_SECTIONS = [
   ]},
   { section: "Reports & Compliance", tabs: [
     { key: "reports", i18n: "reports", icon: "📊", access: r=>["owner","accountant","viewer"].includes(r) },
+    { key: "vat",     i18n: "vat",     icon: "🧾", label: "VAT Filing", access: r=>["owner","accountant","viewer"].includes(r) },
     { key: "tds",     i18n: "tds",     icon: "📋", label: "TDS", access: r=>["owner","accountant"].includes(r) },
     { key: "audit",   i18n: "auditLog", icon: "🔒", label: "Audit Log", access: r=>["owner","accountant"].includes(r) },
   ]},
@@ -581,6 +583,7 @@ function Authed({ session, lang, toggleLang }) {
             {/* Kept for backward-compat during migration — no nav entry */}
             {tab === "parties" && <Parties userId={userId} onChanged={bump} lang={lang} />}
             {tab === "accounts" && <ChartOfAccounts userId={userId} onChanged={bump} lang={lang} />}
+            {tab === "vat"   && <VatFiling />}
             {tab === "tds"   && <TDS userId={userId} />}
             {tab === "notes"     && <CreditDebitNotes />}
             {tab === "recon"     && <BankReconciliation />}

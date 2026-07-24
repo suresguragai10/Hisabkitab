@@ -53,6 +53,11 @@ export async function deleteStructuredAccount(id) {
   if (error) throw error;
 }
 
+export async function mergeAccount(sourceId, targetId) {
+  const { error } = await supabase.rpc("merge_account", { p_source_id: sourceId, p_target_id: targetId });
+  if (error) throw error;
+}
+
 export async function postOpeningJournal({ fiscalYear, date, notes, lines }) {
   const payload = lines
     .map((line) => ({
