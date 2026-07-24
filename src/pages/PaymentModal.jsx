@@ -4,6 +4,7 @@ import {
   recordDocumentPayment,
   reversePaymentAllocation,
 } from "../lib/posting";
+import { todayLocalDate } from "../lib/nepaliCalendar";
 
 const fmt = (n) => Number(n || 0).toLocaleString(undefined, {
   minimumFractionDigits: 2,
@@ -14,7 +15,7 @@ const fmt = (n) => Number(n || 0).toLocaleString(undefined, {
 // The database remains authoritative for allocation totals and overpayment checks.
 export default function PaymentModal({ docType, doc, onClose, onSaved }) {
   const [amount, setAmount] = useState("");
-  const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
+  const [date, setDate] = useState(todayLocalDate());
   const [mode, setMode] = useState("bank");
   const [reference, setReference] = useState("");
   const [notes, setNotes] = useState("");
@@ -24,7 +25,7 @@ export default function PaymentModal({ docType, doc, onClose, onSaved }) {
   const [err, setErr] = useState(null);
   const [reverseId, setReverseId] = useState(null);
   const [reverseReason, setReverseReason] = useState("");
-  const [reverseDate, setReverseDate] = useState(new Date().toISOString().slice(0, 10));
+  const [reverseDate, setReverseDate] = useState(todayLocalDate());
 
   const docNum = docType === "invoice" ? doc.invoice_number : doc.bill_number;
   const partyName = docType === "invoice" ? doc.party_name : doc.vendor_name;

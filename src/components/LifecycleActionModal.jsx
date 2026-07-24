@@ -1,8 +1,9 @@
 import React, { useState } from "react";
+import { todayLocalDate } from "../lib/nepaliCalendar";
 
 export default function LifecycleActionModal({ title, description, actionLabel = "Confirm", onConfirm, onClose }) {
   const [reason, setReason] = useState("");
-  const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
+  const [date, setDate] = useState(todayLocalDate());
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
 

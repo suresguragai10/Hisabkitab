@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { supabase } from "../supabase";
 import { fiscalYearFor } from "../lib/fiscalYear";
+import { todayLocalDate } from "../lib/nepaliCalendar";
 
 const fmt = (n) => Number(n||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2});
 
@@ -287,7 +288,7 @@ export default function SetupWizard({ onComplete }) {
       }
 
       if (lines.length > 0) {
-        const date = new Date().toISOString().slice(0, 10);
+        const date = todayLocalDate();
         const { error } = await supabase.rpc("post_opening_journal", {
           p_fiscal_year: fiscalYearFor(new Date()),
           p_date: date,

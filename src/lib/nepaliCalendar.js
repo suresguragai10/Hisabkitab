@@ -111,10 +111,34 @@ export const BS_MONTHS_NP = ["बैशाख","जेठ","असार","स�
 export const BS_MONTHS_EN = ["Baishakh","Jestha","Ashadh","Shrawan","Bhadra","Ashwin","Kartik","Mangsir","Poush","Magh","Falgun","Chaitra"];
 export const DAYS_NP = ["आइत","सोम","मंगल","बुध","बिही","शुक्र","शनि"];
 
+// Parse a Date or a "YYYY-MM-DD"-style string into a local-midnight Date.
+// Deliberately avoids new Date(string) for date-only strings: that path
+// parses them as UTC midnight, which lands on the wrong local calendar
+// day in positive-UTC-offset zones like Nepal's (UTC+5:45) once read back
+// through local getters or toLocaleDateString.
+function parseLocalDate(input) {
+  if (typeof input === "string") {
+    const m = input.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (m) return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+  }
+  const d = new Date(input);
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
+
+// Format a Date using its local calendar fields as YYYY-MM-DD (see
+// parseLocalDate for why this is preferred over toISOString here).
+export function toLocalDateString(date) {
+  const d = new Date(date);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
 // Convert AD date to BS
 export function adToBs(adDate) {
-  const ad = new Date(adDate);
-  ad.setHours(0,0,0,0);
+  const ad = parseLocalDate(adDate);
   // Days since epoch
   const epoch = new Date(AD_EPOCH);
   epoch.setHours(0,0,0,0);
@@ -168,7 +192,7 @@ export function formatBs(adDate, lang = "en") {
 // Format dual date: BS + AD
 export function formatDualDate(adDate, lang = "en") {
   const bs = formatBs(adDate, lang);
-  const ad = new Date(adDate).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
+  const ad = parseLocalDate(adDate).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
   return `${bs} (${ad})`;
 }
 
@@ -194,4 +218,10 @@ export function toNepaliDigits(n) {
 // Today in BS
 export function todayBs() {
   return adToBs(new Date());
+}
+
+// Today's local calendar date as YYYY-MM-DD (see toLocalDateString for why
+// this is preferred over toISOString here).
+export function todayLocalDate() {
+  return toLocalDateString(new Date());
 }

@@ -15,6 +15,7 @@ import {
   getTrialBalanceReport,
   getVatReport,
 } from "../lib/reports";
+import { todayLocalDate, toLocalDateString } from "../lib/nepaliCalendar";
 
 class ReportBoundary extends Component {
   constructor(props) { super(props); this.state = { error: null }; }
@@ -45,11 +46,11 @@ const money = (value) => Number(value || 0).toLocaleString(undefined, {
 });
 const signedMoney = (value) => Number(value || 0) < 0 ? `(${money(Math.abs(Number(value)))})` : money(value);
 const titleCase = (value) => String(value || "").replaceAll("_", " ").replace(/\b\w/g, (c) => c.toUpperCase());
-const today = () => new Date().toISOString().slice(0, 10);
+const today = () => todayLocalDate();
 const defaultFrom = () => {
   const date = new Date();
   date.setMonth(date.getMonth() - 6);
-  return date.toISOString().slice(0, 10);
+  return toLocalDateString(date);
 };
 
 export default function Reports() {

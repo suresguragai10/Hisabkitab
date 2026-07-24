@@ -1,17 +1,18 @@
 import React, { useEffect, useState } from "react";
 import { listAccounts } from "../lib/db";
 import { downloadCsv, getGeneralLedgerReport, getReportFiscalYears } from "../lib/reports";
+import { todayLocalDate, toLocalDateString } from "../lib/nepaliCalendar";
 
 const money = (value) => Number(value || 0).toLocaleString(undefined, {
   minimumFractionDigits: 2,
   maximumFractionDigits: 2,
 });
 const balance = (value) => `${money(Math.abs(Number(value || 0)))} ${Number(value || 0) >= 0 ? "Dr" : "Cr"}`;
-const today = () => new Date().toISOString().slice(0, 10);
+const today = () => todayLocalDate();
 const defaultFrom = () => {
   const date = new Date();
   date.setMonth(date.getMonth() - 6);
-  return date.toISOString().slice(0, 10);
+  return toLocalDateString(date);
 };
 
 export default function Ledger() {

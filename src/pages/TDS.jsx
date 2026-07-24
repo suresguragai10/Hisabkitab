@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { useTaxRates, DEFAULT_TDS_TYPES } from "../lib/taxRates";
 import { supabase } from "../supabase";
 import { currentFiscalYear } from "../lib/fiscalYear";
-import { formatDualDate } from "../lib/nepaliCalendar";
+import { formatDualDate, todayLocalDate } from "../lib/nepaliCalendar";
 import { listParties } from "../lib/db";
 
 // TDS types are loaded from the database via useTaxRates()
@@ -132,7 +132,7 @@ export default function TDS({ userId }) {
   const fy = currentFiscalYear();
 
   const [form, setForm] = useState({
-    date: new Date().toISOString().slice(0,10),
+    date: todayLocalDate(),
     fiscalYear: fy,
     tdsType: "rent",
     payeeName: "", payeePan: "", payeeId: "",
@@ -141,7 +141,7 @@ export default function TDS({ userId }) {
   });
 
   const [remitForm, setRemitForm] = useState({
-    date: new Date().toISOString().slice(0,10),
+    date: todayLocalDate(),
     periodLabel: "",
     mode: "bank", challanNo: "", notes: "",
   });

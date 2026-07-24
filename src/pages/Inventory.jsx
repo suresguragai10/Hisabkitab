@@ -7,8 +7,9 @@ import {
   reconcileInventoryLedger,
 } from "../lib/inventory";
 import { currentFiscalYear } from "../lib/fiscalYear";
+import { todayLocalDate } from "../lib/nepaliCalendar";
 
-const TODAY = () => new Date().toISOString().slice(0, 10);
+const TODAY = () => todayLocalDate();
 const fmt = (n, digits = 2) => Number(n || 0).toLocaleString("en-IN", {
   minimumFractionDigits: digits,
   maximumFractionDigits: digits,

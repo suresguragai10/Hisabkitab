@@ -48,6 +48,11 @@ export async function deactivateStructuredAccount(id) {
   if (error) throw error;
 }
 
+export async function deleteStructuredAccount(id) {
+  const { error } = await supabase.rpc("delete_structured_account", { p_id: id });
+  if (error) throw error;
+}
+
 export async function postOpeningJournal({ fiscalYear, date, notes, lines }) {
   const payload = lines
     .map((line) => ({
