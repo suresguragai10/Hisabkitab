@@ -2,6 +2,8 @@ import React, { useEffect, useState } from "react";
 import { listAccounts } from "../lib/db";
 import { downloadCsv, getGeneralLedgerReport, getReportFiscalYears } from "../lib/reports";
 import { todayLocalDate, toLocalDateString } from "../lib/nepaliCalendar";
+import { useBusinessProfile } from "../lib/businessProfile";
+import ReportLetterhead from "../components/ReportLetterhead";
 
 const money = (value) => Number(value || 0).toLocaleString(undefined, {
   minimumFractionDigits: 2,
@@ -16,6 +18,7 @@ const defaultFrom = () => {
 };
 
 export default function Ledger() {
+  const { profile } = useBusinessProfile();
   const [accounts, setAccounts] = useState([]);
   const [fiscalYears, setFiscalYears] = useState([]);
   const [accountId, setAccountId] = useState("");
@@ -100,6 +103,7 @@ export default function Ledger() {
       {error && <p className="msg err">{error}</p>}
       {loading && <p className="note">Loading ledger…</p>}
       {ledger && !loading && <>
+        <ReportLetterhead profile={profile} />
         <div className="stat-row">
           <div className="stat"><small>Opening</small><span>{balance(ledger.opening_balance)}</span></div>
           <div className="stat"><small>Period debit</small><span>{money(ledger.period_debit)}</span></div>

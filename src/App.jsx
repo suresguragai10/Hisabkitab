@@ -757,6 +757,7 @@ function Style() {
   .mov-in{color:var(--green2);font-weight:600}
   .mov-out{color:var(--rust);font-weight:600}
   .mov-adj{color:var(--gold);font-weight:600}
+  .report-letterhead{margin-bottom:16px;padding-bottom:12px;border-bottom:2px solid #15543f}
   .report-wrap{padding:4px 0}
   .report-title{font-family:Georgia,serif;font-size:20px;font-weight:700;margin-bottom:4px}
   .report-period{font-size:13px;color:var(--ink2);margin-bottom:16px}

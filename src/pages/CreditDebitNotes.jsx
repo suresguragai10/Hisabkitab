@@ -4,18 +4,20 @@ import { cancelCreditNote, cancelDebitNote } from "../lib/lifecycle";
 import { todayLocalDate } from "../lib/nepaliCalendar";
 import LifecycleActionModal from "../components/LifecycleActionModal";
 import DocumentActivityModal from "../components/DocumentActivityModal";
+import { useBusinessProfile } from "../lib/businessProfile";
 
 const fmt = (value) => Number(value || 0).toLocaleString(undefined, {
   minimumFractionDigits: 2,
   maximumFractionDigits: 2,
 });
 
-function NotePrint({ note, noteType, onClose }) {
+function NotePrint({ note, noteType, profile, onClose }) {
   const credit = noteType === "cn";
   const number = credit ? note.cn_number : note.dn_number;
   const date = credit ? note.cn_date : note.dn_date;
   const party = credit ? note.party_name : note.vendor_name;
   const lines = credit ? note.credit_note_lines || [] : note.debit_note_lines || [];
+  const p = profile || {};
   return (
     <div className="print-overlay">
       <div className="print-actions no-print" style={{ display: "flex", gap: 12, marginBottom: 20 }}>
@@ -25,11 +27,16 @@ function NotePrint({ note, noteType, onClose }) {
       <div className="invoice-paper">
         <div className="inv-header">
           <div style={{ flex: 1 }}>
-            <div className="inv-title">{credit ? "CREDIT NOTE" : "DEBIT NOTE"}</div>
-            <div className="inv-title-sub">{credit ? "क्रेडिट नोट (बिक्री फिर्ता)" : "डेबिट नोट (खरिद फिर्ता)"}</div>
+            <div className="inv-biz-name">{p.biz_name || "Your Business Name"}</div>
+            {p.biz_name_np && <div style={{ fontSize: 14, color: "#444", fontFamily: "'Noto Sans Devanagari',sans-serif" }}>{p.biz_name_np}</div>}
+            <div className="inv-biz-sub">{[p.address, p.city].filter(Boolean).join(", ") || "Address, City"}</div>
+            {p.phone && <div className="inv-biz-sub">📞 {p.phone}</div>}
+            {p.pan_vat && <div className="inv-biz-sub" style={{ fontWeight: 700 }}>PAN/VAT: {p.pan_vat}</div>}
           </div>
           <div style={{ textAlign: "right", fontSize: 12, color: "#555" }}>
-            <div><b>No:</b> {credit ? "CN" : "DN"}-{String(number).padStart(4, "0")}</div>
+            <div className="inv-title" style={{ fontSize: 16 }}>{credit ? "CREDIT NOTE" : "DEBIT NOTE"}</div>
+            <div className="inv-title-sub">{credit ? "क्रेडिट नोट (बिक्री फिर्ता)" : "डेबिट नोट (खरिद फिर्ता)"}</div>
+            <div style={{ marginTop: 6 }}><b>No:</b> {credit ? "CN" : "DN"}-{String(number).padStart(4, "0")}</div>
             <div><b>Date:</b> {date}</div>
             <div><b>FY:</b> {note.fiscal_year}</div>
           </div>
@@ -184,6 +191,7 @@ function ReturnForm({ noteType, invoices, bills, onSave, onClose, busy, error })
 }
 
 export default function CreditDebitNotes() {
+  const { profile } = useBusinessProfile();
   const [noteType, setNoteType] = useState("cn");
   const [notes, setNotes] = useState([]);
   const [invoices, setInvoices] = useState([]);
@@ -242,7 +250,7 @@ export default function CreditDebitNotes() {
     setBusy(false);
   };
 
-  if (printNote) return <NotePrint note={printNote} noteType={noteType} onClose={() => setPrintNote(null)} />;
+  if (printNote) return <NotePrint note={printNote} noteType={noteType} profile={profile} onClose={() => setPrintNote(null)} />;
 
   const credit = noteType === "cn";
   return (

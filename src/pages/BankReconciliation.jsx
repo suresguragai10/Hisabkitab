@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { supabase } from "../supabase";
 import { currentFiscalYear } from "../lib/fiscalYear";
 import { todayLocalDate, toLocalDateString } from "../lib/nepaliCalendar";
+import { useBusinessProfile } from "../lib/businessProfile";
 
 const fmt  = (n) => Number(n||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2});
 const fmtD = (d) => d ? new Date(d).toLocaleDateString("en-NP") : "—";
@@ -42,12 +43,13 @@ async function fetchVouchers(accountId, fromDate, toDate) {
 }
 
 // ── Reconciliation print view ─────────────────────────────────
-function ReconciliationPrint({ stmt, lines, ledgerBalance, onClose }) {
+function ReconciliationPrint({ stmt, lines, ledgerBalance, profile, onClose }) {
   const matched    = lines.filter(l=>l.is_matched);
   const unmatched  = lines.filter(l=>!l.is_matched);
   const totalDep   = lines.reduce((s,l)=>s+Number(l.deposits),0);
   const totalWith  = lines.reduce((s,l)=>s+Number(l.withdrawals),0);
   const diff       = Number(stmt.closing_balance) - ledgerBalance;
+  const p = profile || {};
 
   return (
     <div className="print-overlay">
@@ -58,11 +60,15 @@ function ReconciliationPrint({ stmt, lines, ledgerBalance, onClose }) {
       <div className="invoice-paper">
         <div className="inv-header">
           <div style={{flex:1}}>
-            <div className="inv-title" style={{fontSize:18}}>Bank Reconciliation Statement</div>
-            <div className="inv-title-sub">बैंक मिलान विवरण</div>
+            <div className="inv-biz-name">{p.biz_name || "Your Business Name"}</div>
+            {p.biz_name_np && <div style={{ fontSize: 14, color: "#444", fontFamily: "'Noto Sans Devanagari',sans-serif" }}>{p.biz_name_np}</div>}
+            <div className="inv-biz-sub">{[p.address, p.city].filter(Boolean).join(", ") || "Address, City"}</div>
+            {p.pan_vat && <div className="inv-biz-sub" style={{ fontWeight: 700 }}>PAN/VAT: {p.pan_vat}</div>}
           </div>
           <div style={{textAlign:"right",fontSize:12}}>
-            <div><b>Account:</b> {stmt.account_name}</div>
+            <div className="inv-title" style={{fontSize:16}}>Bank Reconciliation Statement</div>
+            <div className="inv-title-sub">बैंक मिलान विवरण</div>
+            <div style={{marginTop:6}}><b>Account:</b> {stmt.account_name}</div>
             <div><b>Period:</b> {stmt.from_date} to {stmt.to_date}</div>
           </div>
         </div>
@@ -103,6 +109,7 @@ function ReconciliationPrint({ stmt, lines, ledgerBalance, onClose }) {
 
 // ── Main Bank Reconciliation page ─────────────────────────────
 export default function BankReconciliation() {
+  const { profile } = useBusinessProfile();
   const [statements,    setStatements]    = useState([]);
   const [bankAccounts,  setBankAccounts]  = useState([]);
   const [activeStmt,    setActiveStmt]    = useState(null);
@@ -261,7 +268,7 @@ export default function BankReconciliation() {
 
   if (showPrint && activeStmt) return (
     <ReconciliationPrint stmt={activeStmt} lines={lines}
-      ledgerBalance={ledgerBalance} onClose={()=>setShowPrint(false)} />
+      ledgerBalance={ledgerBalance} profile={profile} onClose={()=>setShowPrint(false)} />
   );
 
   return (

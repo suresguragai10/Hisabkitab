@@ -16,6 +16,8 @@ import {
   getVatReport,
 } from "../lib/reports";
 import { todayLocalDate, toLocalDateString } from "../lib/nepaliCalendar";
+import { useBusinessProfile } from "../lib/businessProfile";
+import ReportLetterhead from "../components/ReportLetterhead";
 
 class ReportBoundary extends Component {
   constructor(props) { super(props); this.state = { error: null }; }
@@ -54,6 +56,7 @@ const defaultFrom = () => {
 };
 
 export default function Reports() {
+  const { profile } = useBusinessProfile();
   const [report, setReport] = useState("pl");
   const [fromDate, setFromDate] = useState(defaultFrom);
   const [toDate, setToDate] = useState(today);
@@ -147,6 +150,7 @@ export default function Reports() {
       {loading && <p className="note">Computing report…</p>}
       {data && !loading && (
         <ReportBoundary key={`${report}-${fromDate}-${toDate}-${asOfDate}-${fiscalYear}`}>
+          <ReportLetterhead profile={profile} />
           <ReportView report={report} data={data} onDrill={setDrillAccount} />
         </ReportBoundary>
       )}
