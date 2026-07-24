@@ -104,7 +104,7 @@ export async function deactivateAccount(id) {
 export async function listParties() {
   const { data, error } = await supabase
     .from("parties")
-    .select("*, accounts(id, name, opening_balance, opening_balance_type)")
+    .select("*, accounts!account_id(id, name, opening_balance, opening_balance_type)")
     .order("created_at", { ascending: false });
   if (error) throw error;
   return data;
@@ -136,7 +136,7 @@ export async function createParty(_userId, { name, partyType, phone, email, addr
   if (error) throw error;
   const { data, error: readError } = await supabase
     .from("parties")
-    .select("*, accounts(id, name, account_code, opening_balance, opening_balance_type)")
+    .select("*, accounts!account_id(id, name, account_code, opening_balance, opening_balance_type)")
     .eq("id", partyId)
     .single();
   if (readError) throw readError;
