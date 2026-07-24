@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { adToBs, bsToAd, BS_MONTHS_EN, BS_MONTHS_NP, formatDualDate } from "../lib/nepaliCalendar";
+import { adToBs, bsToAd, BS_MONTHS_EN, BS_MONTHS_NP, formatDualDate, toLocalDateString } from "../lib/nepaliCalendar";
 import { getLang } from "../lib/i18n";
 
 // ============================================================
@@ -15,7 +15,7 @@ export default function BsDateInput({ value, onChange, lang }) {
   const monthNames = l === "np" ? BS_MONTHS_NP : BS_MONTHS_EN;
 
   const today = new Date();
-  const bs = value ? adToBs(new Date(value)) : adToBs(today);
+  const bs = value ? adToBs(value) : adToBs(today);
 
   const [bsYear, setBsYear] = useState(bs.year);
   const [bsMonth, setBsMonth] = useState(bs.month);
@@ -25,7 +25,7 @@ export default function BsDateInput({ value, onChange, lang }) {
   useEffect(() => {
     const ad = bsToAd(bsYear, bsMonth, bsDay);
     if (ad) {
-      const adStr = ad.toISOString().slice(0, 10);
+      const adStr = toLocalDateString(ad);
       onChange && onChange(adStr);
     }
   }, [bsYear, bsMonth, bsDay]);
@@ -33,7 +33,7 @@ export default function BsDateInput({ value, onChange, lang }) {
   // When value prop changes externally, sync BS fields
   useEffect(() => {
     if (value) {
-      const b = adToBs(new Date(value));
+      const b = adToBs(value);
       setBsYear(b.year);
       setBsMonth(b.month);
       setBsDay(b.day);
@@ -43,7 +43,7 @@ export default function BsDateInput({ value, onChange, lang }) {
   const years = Array.from({ length: 20 }, (_, i) => 2075 + i);
   const days = Array.from({ length: 32 }, (_, i) => i + 1);
 
-  const dual = value ? formatDualDate(new Date(value), l) : "";
+  const dual = value ? formatDualDate(value, l) : "";
 
   return (
     <div className="bs-date-wrap">

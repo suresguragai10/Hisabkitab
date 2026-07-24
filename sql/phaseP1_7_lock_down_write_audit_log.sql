@@ -1,0 +1,22 @@
+-- ============================================================
+-- HisabKitab P1.7 — Revoke direct client access to write_audit_log().
+--
+-- Every real audit entry is written internally via
+-- `perform write_audit_log(...)` inside other SECURITY DEFINER
+-- functions (create_contact, post_voucher, file_vat_return, etc.),
+-- which run as the function owner and are unaffected by this revoke.
+--
+-- The frontend has its own wrapper (writeAuditLog in src/lib/db.js)
+-- that calls this RPC directly -- but it is never actually called
+-- anywhere in the app (confirmed via grep). Left reachable, it would
+-- let any authenticated client submit an arbitrary table name, record
+-- id, and before/after JSON, creating fabricated audit entries
+-- indistinguishable from real ones.
+-- ============================================================
+
+-- PostgreSQL grants EXECUTE on new functions to PUBLIC by default, and
+-- every role (including authenticated/anon) implicitly inherits from
+-- PUBLIC -- so revoking from authenticated/anon alone does nothing if
+-- the PUBLIC-wide default grant was never explicitly revoked. Confirmed
+-- via has_function_privilege('public', ...) that this was the case here.
+revoke execute on function write_audit_log(text, text, text, jsonb, jsonb) from public, authenticated, anon;

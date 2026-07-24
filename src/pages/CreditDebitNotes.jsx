@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { supabase } from "../supabase";
 import { cancelCreditNote, cancelDebitNote } from "../lib/lifecycle";
+import { todayLocalDate } from "../lib/nepaliCalendar";
 import LifecycleActionModal from "../components/LifecycleActionModal";
 import DocumentActivityModal from "../components/DocumentActivityModal";
 
@@ -72,7 +73,7 @@ function ReturnForm({ noteType, invoices, bills, onSave, onClose, busy, error })
   const credit = noteType === "cn";
   const documents = credit ? invoices : bills;
   const [documentId, setDocumentId] = useState("");
-  const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
+  const [date, setDate] = useState(todayLocalDate());
   const [reason, setReason] = useState("");
   const [notes, setNotes] = useState("");
   const [lines, setLines] = useState([]);

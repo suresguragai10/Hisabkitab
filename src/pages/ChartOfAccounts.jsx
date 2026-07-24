@@ -1,9 +1,11 @@
 import React, { useEffect, useMemo, useState } from "react";
 import BsDateInput from "../components/BsDateInput";
 import { fiscalYearFor } from "../lib/fiscalYear";
+import { todayLocalDate } from "../lib/nepaliCalendar";
 import {
   createStructuredAccount,
   deactivateStructuredAccount,
+  deleteStructuredAccount,
   listOpeningJournals,
   listStructuredAccounts,
   migrateLegacyOpeningBalances,
@@ -40,7 +42,7 @@ const SUBTYPES = [
 ];
 
 const CF_CATEGORIES = ["operating", "investing", "financing", "non_cash", "not_applicable"];
-const today = () => new Date().toISOString().slice(0, 10);
+const today = () => todayLocalDate();
 const blankOpeningLine = () => ({ accountId: "", debit: "", credit: "", description: "" });
 
 function defaultForm() {
@@ -319,9 +321,16 @@ export default function ChartOfAccounts({ onChanged }) {
   };
 
   const deactivate = async (account) => {
-    if (!window.confirm(`Deactivate ${account.account_code} · ${account.name}?`)) return;
+    if (!window.confirm(`Archive ${account.account_code} · ${account.name}? It stays in your records but won't appear in day-to-day use.`)) return;
     setError(null);
     try { await deactivateStructuredAccount(account.id); await load(); onChanged?.(); }
+    catch (e) { setError(e.message); }
+  };
+
+  const remove = async (account) => {
+    if (!window.confirm(`Permanently delete ${account.account_code} · ${account.name}? This cannot be undone. Only accounts that were never used for any transaction can be deleted.`)) return;
+    setError(null);
+    try { await deleteStructuredAccount(account.id); await load(); onChanged?.(); }
     catch (e) { setError(e.message); }
   };
 
@@ -364,7 +373,8 @@ export default function ChartOfAccounts({ onChanged }) {
                 </td>
                 <td style={{ whiteSpace: "nowrap" }}>
                   {!account.is_system_account && <button className="link" onClick={() => beginEdit(account)}>Edit</button>}
-                  {!account.is_system_account && !account.is_control_account && !account.is_party_account && account.is_active && <button className="link" onClick={() => deactivate(account)}>Deactivate</button>}
+                  {!account.is_system_account && !account.is_control_account && !account.is_party_account && account.is_active && <button className="link" onClick={() => deactivate(account)}>Archive</button>}
+                  {!account.is_system_account && !account.is_control_account && !account.is_party_account && <button className="link" style={{ color: "var(--rust)" }} onClick={() => remove(account)}>Delete</button>}
                 </td>
               </tr>
             ))}</tbody>

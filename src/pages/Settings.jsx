@@ -2,33 +2,39 @@ import React, { useEffect, useState } from "react";
 import { supabase } from "../supabase";
 import { currentFiscalYear } from "../lib/fiscalYear";
 import { useWorkspace } from "../lib/workspace";
+import { bsToAd, BS_MONTHS_EN } from "../lib/nepaliCalendar";
 
 // ── Nepal fiscal year months (Shrawan start) ─────────────────
-// Approximate AD date ranges for each BS month in the fiscal year
-// BS 2081/82 = 2024-07-17 to 2025-07-15 (typical)
-const NEPALI_MONTHS = [
-  "Shrawan","Bhadra","Ashwin","Kartik","Mangsir","Poush",
-  "Magh","Falgun","Chaitra","Baishakh","Jestha","Ashadh"
-];
+// BS month indices (0=Baishakh .. 11=Chaitra) in fiscal-year order:
+// Shrawan (3) through Chaitra (11) of the start year, then
+// Baishakh (0) through Ashadh (2) of the following BS year.
+const FY_MONTH_INDICES = [3,4,5,6,7,8,9,10,11,0,1,2];
+
+// Format a Date using its local calendar fields (not toISOString, which
+// shifts to UTC and can land on the wrong day in positive-offset zones
+// like Nepal's UTC+5:45).
+function toDateString(d) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
 
 function generatePeriods(fiscalYear) {
-  // Parse "2081/82" to get BS year
-  const bsYear = parseInt(fiscalYear.split("/")[0]);
-  // Each period is a BS month; approximate AD dates
-  // Shrawan 2081 ≈ 2024-07-17 to 2024-08-16
-  // We use approximate 30-day months; the exact mapping is in nepaliCalendar
-  // For period locks, approximate dates are fine — the check is by stored from/to
-  const base = new Date(2024, 6, 17); // approx Shrawan 1 = Jul 17 2024 for 2081
-  const yearOffset = bsYear - 2081;
-  const startMs = base.getTime() + yearOffset * 365.25 * 24 * 3600 * 1000;
+  // Parse "2082-83" (or legacy "2082/83") to get the BS start year
+  const fyStartYear = parseInt(fiscalYear.split(/[-/]/)[0], 10);
 
-  return NEPALI_MONTHS.map((name, i) => {
-    const from = new Date(startMs + i * 30.5 * 24 * 3600 * 1000);
-    const to   = new Date(startMs + (i+1) * 30.5 * 24 * 3600 * 1000 - 24 * 3600 * 1000);
+  return FY_MONTH_INDICES.map((monthIdx, i) => {
+    const bsYear = i < 9 ? fyStartYear : fyStartYear + 1;
+    const from = bsToAd(bsYear, monthIdx, 1);
+    const nextMonthIdx = (monthIdx + 1) % 12;
+    const nextBsYear = monthIdx === 11 ? bsYear + 1 : bsYear;
+    const nextFrom = bsToAd(nextBsYear, nextMonthIdx, 1);
+    const to = new Date(nextFrom.getTime() - 24 * 3600 * 1000);
     return {
-      label:     `${name} ${bsYear + (i >= 9 ? 1 : 0)}`,
-      from_date: from.toISOString().slice(0,10),
-      to_date:   to.toISOString().slice(0,10),
+      label:     `${BS_MONTHS_EN[monthIdx]} ${bsYear}`,
+      from_date: toDateString(from),
+      to_date:   toDateString(to),
     };
   });
 }
@@ -148,7 +154,7 @@ export default function Settings() {
             <label className="fld" style={{margin:0,flex:"0 0 160px"}}>
               Fiscal Year
               <input value={fiscalYear} onChange={e=>setFiscalYear(e.target.value)}
-                placeholder="e.g. 2081/82" style={{marginTop:4}} />
+                placeholder="e.g. 2082-83" style={{marginTop:4}} />
             </label>
             {canEdit && periods.length === 0 && (
               <button className="btn" style={{marginTop:20}} onClick={generatePeriodRows} disabled={busy}>

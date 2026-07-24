@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { supabase } from "../supabase";
 import { listParties } from "../lib/db";
 import { currentFiscalYear } from "../lib/fiscalYear";
+import { todayLocalDate } from "../lib/nepaliCalendar";
 import { createInvoiceWithPosting, refreshDocumentPaymentStatuses } from "../lib/posting";
 import { cancelInvoiceDocument, deleteDocumentDraft, markInvoicePrinted, postInvoiceDraft, saveInvoiceDraft } from "../lib/lifecycle";
 import LifecycleActionModal from "../components/LifecycleActionModal";
@@ -275,7 +276,7 @@ export default function Invoices() {
   const emptyForm = () => ({
     fiscalYear: currentFiscalYear(),
     partyId: "", partyName: "", partyAddress: "", partyPan: "",
-    invoiceDate: new Date().toISOString().slice(0, 10),
+    invoiceDate: todayLocalDate(),
     dueDate: "", notes: "",
   });
   const [form, setForm] = useState(emptyForm);

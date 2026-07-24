@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { supabase } from "../supabase";
 import { currentFiscalYear } from "../lib/fiscalYear";
+import { todayLocalDate, toLocalDateString } from "../lib/nepaliCalendar";
 
 const fmt  = (n) => Number(n||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2});
 const fmtD = (d) => d ? new Date(d).toLocaleDateString("en-NP") : "—";
@@ -121,7 +122,7 @@ export default function BankReconciliation() {
   });
 
   const [lineForm, setLineForm] = useState({
-    txnDate: new Date().toISOString().slice(0,10),
+    txnDate: todayLocalDate(),
     description: "", reference: "",
     deposits: "", withdrawals: "", balance: "",
   });
@@ -193,7 +194,7 @@ export default function BankReconciliation() {
         p_balance:      parseFloat(lineForm.balance)||null,
       });
       if (error) throw error;
-      setLineForm({txnDate:new Date().toISOString().slice(0,10),description:"",reference:"",deposits:"",withdrawals:"",balance:""});
+      setLineForm({txnDate:todayLocalDate(),description:"",reference:"",deposits:"",withdrawals:"",balance:""});
       await loadLines(activeStmt);
     } catch(e) { setErr(e.message); }
     setBusy(false);
@@ -207,7 +208,7 @@ export default function BankReconciliation() {
     setBusy(true); setErr(null);
     try {
       const lines = validRows.map(r=>({
-        txn_date:    new Date(r[0]).toISOString().slice(0,10),
+        txn_date:    toLocalDateString(new Date(r[0])),
         description: r[1]||"",
         withdrawals: parseFloat(r[2])||0,
         deposits:    parseFloat(r[3])||0,

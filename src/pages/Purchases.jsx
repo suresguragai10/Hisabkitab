@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { supabase } from "../supabase";
 import { listParties } from "../lib/db";
 import { currentFiscalYear } from "../lib/fiscalYear";
+import { todayLocalDate } from "../lib/nepaliCalendar";
 import { createBillWithPosting, refreshDocumentPaymentStatuses } from "../lib/posting";
 import { cancelBillDocument, deleteDocumentDraft, postBillDraft, saveBillDraft } from "../lib/lifecycle";
 import LifecycleActionModal from "../components/LifecycleActionModal";
@@ -127,7 +128,7 @@ export default function Purchases() {
   const emptyForm = () => ({
     fiscalYear: currentFiscalYear(),
     vendorId: "", vendorName: "", vendorAddress: "", vendorPan: "",
-    vendorBillRef: "", billDate: new Date().toISOString().slice(0, 10),
+    vendorBillRef: "", billDate: todayLocalDate(),
     dueDate: "", notes: "",
   });
   const [form, setForm] = useState(emptyForm);
