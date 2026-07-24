@@ -8,6 +8,7 @@ import {
   deleteStructuredAccount,
   listOpeningJournals,
   listStructuredAccounts,
+  mergeAccount,
   migrateLegacyOpeningBalances,
   postOpeningJournal,
   updateStructuredAccount,
@@ -267,6 +268,8 @@ export default function ChartOfAccounts({ onChanged }) {
   const [showOpening, setShowOpening] = useState(false);
   const [busy, setBusy] = useState(false);
   const [filter, setFilter] = useState("all");
+  const [merging, setMerging] = useState(null); // account being merged away
+  const [mergeTargetId, setMergeTargetId] = useState("");
 
   const load = async () => {
     setLoading(true);
@@ -334,6 +337,19 @@ export default function ChartOfAccounts({ onChanged }) {
     catch (e) { setError(e.message); }
   };
 
+  const doMerge = async () => {
+    if (!mergeTargetId) { setError("Choose an account to merge into."); return; }
+    const target = accounts.find((a) => a.id === mergeTargetId);
+    if (!window.confirm(`Move every transaction from ${merging.account_code} · ${merging.name} into ${target.account_code} · ${target.name}, then delete ${merging.name}? This cannot be undone.`)) return;
+    setBusy(true); setError(null);
+    try {
+      await mergeAccount(merging.id, mergeTargetId);
+      setMerging(null); setMergeTargetId("");
+      await load(); onChanged?.();
+    } catch (e) { setError(e.message); }
+    setBusy(false);
+  };
+
   return (
     <div className="panel">
       <div className="panel-head">
@@ -357,8 +373,13 @@ export default function ChartOfAccounts({ onChanged }) {
         <div className="table-scroll">
           <table className="tbl">
             <thead><tr><th>Code</th><th>Account</th><th>Report class</th><th>Subtype</th><th>Normal</th><th>Flags</th><th /></tr></thead>
-            <tbody>{visible.map(({ account, depth }) => (
-              <tr key={account.id} style={{ opacity: account.is_active ? 1 : 0.55 }}>
+            <tbody>{visible.map(({ account, depth }) => {
+              const mergeable = !account.is_system_account && !account.is_control_account && !account.is_party_account;
+              const mergeTargets = accounts.filter((a) =>
+                a.id !== account.id && a.is_active && a.report_class === account.report_class && a.account_type === account.account_type);
+              return (
+              <React.Fragment key={account.id}>
+              <tr style={{ opacity: account.is_active ? 1 : 0.55 }}>
                 <td><b>{account.account_code}</b></td>
                 <td style={{ paddingLeft: 12 + depth * 22 }}>{depth > 0 && <span className="muted">↳ </span>}{account.name}</td>
                 <td>{CLASS_LABELS[account.report_class] || account.report_class}</td>
@@ -373,11 +394,34 @@ export default function ChartOfAccounts({ onChanged }) {
                 </td>
                 <td style={{ whiteSpace: "nowrap" }}>
                   {!account.is_system_account && <button className="link" onClick={() => beginEdit(account)}>Edit</button>}
-                  {!account.is_system_account && !account.is_control_account && !account.is_party_account && account.is_active && <button className="link" onClick={() => deactivate(account)}>Archive</button>}
-                  {!account.is_system_account && !account.is_control_account && !account.is_party_account && <button className="link" style={{ color: "var(--rust)" }} onClick={() => remove(account)}>Delete</button>}
+                  {mergeable && account.is_active && <button className="link" onClick={() => deactivate(account)}>Archive</button>}
+                  {mergeable && <button className="link" style={{ color: "var(--rust)" }} onClick={() => remove(account)}>Delete</button>}
+                  {mergeable && account.is_active && mergeTargets.length > 0 && (
+                    <button className="link" onClick={() => { setMerging(merging?.id === account.id ? null : account); setMergeTargetId(""); setError(null); }}>
+                      {merging?.id === account.id ? "Cancel" : "Merge into…"}
+                    </button>
+                  )}
                 </td>
               </tr>
-            ))}</tbody>
+              {merging?.id === account.id && (
+                <tr>
+                  <td colSpan={7}>
+                    <div style={{ display: "flex", gap: 8, alignItems: "center", padding: "8px 4px" }}>
+                      <span>Merge <b>{account.name}</b> into:</span>
+                      <select value={mergeTargetId} onChange={(e) => setMergeTargetId(e.target.value)}>
+                        <option value="">— choose account —</option>
+                        {mergeTargets.map((a) => <option key={a.id} value={a.id}>{a.account_code} · {a.name}</option>)}
+                      </select>
+                      <button className="btn" disabled={busy || !mergeTargetId} onClick={doMerge}>
+                        {busy ? "Merging…" : "Merge"}
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              )}
+              </React.Fragment>
+              );
+            })}</tbody>
           </table>
         </div>
       )}
