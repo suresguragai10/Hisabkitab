@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { supabase } from "../supabase";
 import { useWorkspace } from "../lib/workspace";
+import { confirmDialog, showToast } from "../lib/dialogs";
 
 const ROLES = [
   { value: "accountant", label: "Accountant", desc: "Full access except team management" },
@@ -48,7 +49,7 @@ export default function TeamMembers() {
   };
 
   const remove = async (memberUserId, email) => {
-    if (!confirm(`Remove ${email} from your team? They will lose access immediately.`)) return;
+    if (!(await confirmDialog(`Remove ${email} from your team? They will lose access immediately.`))) return;
     try {
       const { error } = await supabase.rpc("remove_member", { p_member_user_id: memberUserId });
       if (error) throw error;
@@ -111,7 +112,7 @@ export default function TeamMembers() {
               <div style={{display:"flex",gap:8,alignItems:"center"}}>
                 <input readOnly value={inviteLink} style={{flex:1,fontFamily:"monospace",fontSize:12}}
                   onFocus={e=>e.target.select()} />
-                <button className="ghost-btn" onClick={()=>{navigator.clipboard.writeText(inviteLink); alert("Copied!");}}>
+                <button className="ghost-btn" onClick={()=>{navigator.clipboard.writeText(inviteLink); showToast("Copied!", "success");}}>
                   Copy
                 </button>
               </div>

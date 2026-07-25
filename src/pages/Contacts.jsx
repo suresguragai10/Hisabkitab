@@ -11,6 +11,7 @@
 // ============================================================
 
 import React, { useEffect, useMemo, useState } from "react";
+import { confirmDialog } from "../lib/dialogs";
 import {
   listContacts, createContact, updateContact, deactivateContact,
 } from "../lib/contacts";
@@ -285,7 +286,7 @@ export default function Contacts({ userId, onChanged, onViewStatement }) {
   };
 
   const deactivate = async (row) => {
-    if (!confirm(`Deactivate ${row.name}? They'll be hidden but their history stays intact.`)) return;
+    if (!(await confirmDialog(`Deactivate ${row.name}? They'll be hidden but their history stays intact.`))) return;
     try {
       await deactivateContact(row.id);
       await load();

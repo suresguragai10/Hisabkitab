@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import BsDateInput from "../components/BsDateInput";
 import { fiscalYearFor } from "../lib/fiscalYear";
 import { todayLocalDate } from "../lib/nepaliCalendar";
+import { confirmDialog } from "../lib/dialogs";
 import {
   createStructuredAccount,
   deactivateStructuredAccount,
@@ -324,14 +325,14 @@ export default function ChartOfAccounts({ onChanged }) {
   };
 
   const deactivate = async (account) => {
-    if (!window.confirm(`Archive ${account.account_code} · ${account.name}? It stays in your records but won't appear in day-to-day use.`)) return;
+    if (!(await confirmDialog(`Archive ${account.account_code} · ${account.name}? It stays in your records but won't appear in day-to-day use.`))) return;
     setError(null);
     try { await deactivateStructuredAccount(account.id); await load(); onChanged?.(); }
     catch (e) { setError(e.message); }
   };
 
   const remove = async (account) => {
-    if (!window.confirm(`Permanently delete ${account.account_code} · ${account.name}? This cannot be undone. Only accounts that were never used for any transaction can be deleted.`)) return;
+    if (!(await confirmDialog(`Permanently delete ${account.account_code} · ${account.name}? This cannot be undone. Only accounts that were never used for any transaction can be deleted.`))) return;
     setError(null);
     try { await deleteStructuredAccount(account.id); await load(); onChanged?.(); }
     catch (e) { setError(e.message); }
@@ -340,7 +341,7 @@ export default function ChartOfAccounts({ onChanged }) {
   const doMerge = async () => {
     if (!mergeTargetId) { setError("Choose an account to merge into."); return; }
     const target = accounts.find((a) => a.id === mergeTargetId);
-    if (!window.confirm(`Move every transaction from ${merging.account_code} · ${merging.name} into ${target.account_code} · ${target.name}, then delete ${merging.name}? This cannot be undone.`)) return;
+    if (!(await confirmDialog(`Move every transaction from ${merging.account_code} · ${merging.name} into ${target.account_code} · ${target.name}, then delete ${merging.name}? This cannot be undone.`))) return;
     setBusy(true); setError(null);
     try {
       await mergeAccount(merging.id, mergeTargetId);

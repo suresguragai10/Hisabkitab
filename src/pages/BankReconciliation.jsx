@@ -3,6 +3,7 @@ import { supabase } from "../supabase";
 import { currentFiscalYear } from "../lib/fiscalYear";
 import { todayLocalDate, toLocalDateString } from "../lib/nepaliCalendar";
 import { useBusinessProfile } from "../lib/businessProfile";
+import { confirmDialog } from "../lib/dialogs";
 
 const fmt  = (n) => Number(n||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2});
 const fmtD = (d) => d ? new Date(d).toLocaleDateString("en-NP") : "—";
@@ -244,7 +245,7 @@ export default function BankReconciliation() {
   };
 
   const finalizeReconciliation = async () => {
-    if (!confirm("Mark this reconciliation as complete? You can still view it afterwards.")) return;
+    if (!(await confirmDialog("Mark this reconciliation as complete? You can still view it afterwards."))) return;
     await supabase.rpc("reconcile_statement", { p_statement_id: activeStmt.id });
     await load();
     setActiveStmt(s=>({...s, status:"reconciled"}));

@@ -49,6 +49,7 @@ import Purchases from "./pages/Purchases";
 import Inventory from "./pages/Inventory";
 import Reports from "./pages/Reports";
 import Ledger from "./pages/Ledger";
+import DialogHost from "./components/DialogHost";
 
 // ── Root ──────────────────────────────────────────────────────
 export default function App() {
@@ -593,6 +594,7 @@ function Authed({ session, lang, toggleLang }) {
           </TabErrorBoundary>
         )}
       </main>
+      <DialogHost />
     </div>
     </WorkspaceContext.Provider>
   );
@@ -825,6 +827,11 @@ function Style() {
   .modal-card{background:#fff;border-radius:16px;width:100%;max-width:460px;max-height:88vh;overflow-y:auto;padding:24px;box-shadow:0 20px 60px #00000040}
   .modal-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}
   .modal-head h3{margin:0;font-family:Georgia,serif;font-size:17px}
+  .toast-stack{position:fixed;bottom:20px;right:20px;z-index:9999;display:flex;flex-direction:column;gap:8px;max-width:320px}
+  .toast{background:#222;color:#fff;padding:10px 16px;border-radius:8px;font-size:13px;box-shadow:0 8px 24px #00000040;animation:toast-in .15s ease-out}
+  .toast-error{background:var(--rust,#a33)}
+  .toast-success{background:#1e7e34}
+  @keyframes toast-in{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
   .pay-summary{background:#f8f8f6;border-radius:10px;padding:12px 16px;margin-bottom:16px}
   .pay-summary-row{display:flex;justify-content:space-between;font-size:13px;padding:3px 0}
   .pay-balance{font-weight:700;font-size:15px;color:var(--rust);border-top:1px solid var(--line);margin-top:6px;padding-top:8px}

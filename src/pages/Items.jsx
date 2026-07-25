@@ -12,6 +12,7 @@ import {
   listCategories, createCategory,
 } from "../lib/items";
 import { listContacts } from "../lib/contacts";
+import { confirmDialog } from "../lib/dialogs";
 
 const ITEM_TYPES = [
   { key: "goods",         label: "Goods (tracked in inventory)" },
@@ -415,7 +416,7 @@ export default function Items({ onChanged }) {
                   {r.is_active && (
                     <>{" · "}
                       <button className="link" style={{ color: "var(--rust,#a4442d)" }}
-                              onClick={() => { if (confirm(`Deactivate ${r.name}?`)) deactivateItem(r.id).then(load); }}>
+                              onClick={async () => { if (await confirmDialog(`Deactivate ${r.name}?`)) deactivateItem(r.id).then(load); }}>
                         Deactivate
                       </button>
                     </>

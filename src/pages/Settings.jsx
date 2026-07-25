@@ -3,6 +3,7 @@ import { supabase } from "../supabase";
 import { currentFiscalYear } from "../lib/fiscalYear";
 import { useWorkspace } from "../lib/workspace";
 import { bsToAd, BS_MONTHS_EN } from "../lib/nepaliCalendar";
+import { confirmDialog, promptDialog } from "../lib/dialogs";
 
 // ── Nepal fiscal year months (Shrawan start) ─────────────────
 // BS month indices (0=Baishakh .. 11=Chaitra) in fiscal-year order:
@@ -96,7 +97,7 @@ export default function Settings() {
     // why it was reopened.
     let reason = null;
     if (period.is_locked) {
-      const input = window.prompt(`Reason for reopening "${period.period_label}"?`);
+      const input = await promptDialog(`Reason for reopening "${period.period_label}"?`, { minLength: 0, confirmLabel: "Reopen" });
       if (input === null) return; // user cancelled
       reason = input.trim() || null;
     }
@@ -116,7 +117,7 @@ export default function Settings() {
   };
 
   const lockAll = async () => {
-    if (!confirm(`Lock ALL unlocked periods in ${fiscalYear}? This prevents any new vouchers in those months.`)) return;
+    if (!(await confirmDialog(`Lock ALL unlocked periods in ${fiscalYear}? This prevents any new vouchers in those months.`))) return;
     setBusy(true); setErr(null);
     try {
       for (const p of periods.filter(p => !p.is_locked)) {

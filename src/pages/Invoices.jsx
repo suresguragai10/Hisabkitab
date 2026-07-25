@@ -8,6 +8,7 @@ import { cancelInvoiceDocument, deleteDocumentDraft, markInvoicePrinted, postInv
 import LifecycleActionModal from "../components/LifecycleActionModal";
 import DocumentActivityModal from "../components/DocumentActivityModal";
 import PaymentModal from "./PaymentModal";
+import { showToast } from "../lib/dialogs";
 import { useTaxRates } from "../lib/taxRates";
 import { useBusinessProfile } from "../lib/businessProfile";
 import { adToBs, formatDualDate, BS_MONTHS_EN } from "../lib/nepaliCalendar";
@@ -228,7 +229,7 @@ function BizProfilePanel({ profile, onSave, onClose }) {
   const save = async () => {
     setBusy(true);
     try { await onSave(form); setOk(true); setTimeout(onClose, 1000); }
-    catch(e) { alert("Save failed: " + e.message); }
+    catch(e) { showToast("Save failed: " + e.message, "error"); }
     setBusy(false);
   };
 
