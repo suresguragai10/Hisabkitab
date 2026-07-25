@@ -190,6 +190,12 @@ function StatusBanner({ good, goodText, badText, difference }) {
 }
 
 function AccountButton({ row, onDrill }) {
+  // Rolled-up party-account totals (e.g. "Accounts Receivable (all
+  // customers)") have no single real ledger account behind them, so
+  // there's nothing to drill into -- show plain text instead of a link.
+  if (!row.account_id) {
+    return <span>{row.name}</span>;
+  }
   return <button className="link" style={{ display: "inline", textAlign: "left" }} onClick={() => onDrill({ id: row.account_id, account_code: row.account_code, name: row.name })}>
     {row.account_code ? `${row.account_code} · ` : ""}{row.name}
   </button>;
@@ -234,7 +240,7 @@ function TrialBalance({ data, onDrill }) {
 function ReportSection({ title, rows, onDrill, total }) {
   return <div className="report-section">
     <div className="report-section-title">{title}</div>
-    <table className="tbl"><tbody>{rows.map((row) => <tr key={row.account_id}>
+    <table className="tbl"><tbody>{rows.map((row) => <tr key={row.account_id || row.name}>
       <td><AccountButton row={row} onDrill={onDrill} /></td><td className="num">{signedMoney(row.amount)}</td>
     </tr>)}</tbody><tfoot><tr><td><b>Total {title}</b></td><td className="num"><b>{signedMoney(total)}</b></td></tr></tfoot></table>
   </div>;
