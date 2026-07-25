@@ -104,6 +104,17 @@ const BS_MONTHS = [
 ];
 
 const BS_START_YEAR = 2000;
+export const BS_MIN_YEAR = BS_START_YEAR;
+export const BS_MAX_YEAR = BS_START_YEAR + BS_MONTHS.length - 1;
+
+// Days in a given BS month (0-indexed, Baishakh=0..Chaitra=11). Returns
+// null for a year outside the supported table -- callers must not
+// guess a day count for a year we have no real data for.
+export function daysInBsMonth(bsYear, bsMonth) {
+  const yearIdx = bsYear - BS_START_YEAR;
+  if (yearIdx < 0 || yearIdx >= BS_MONTHS.length || bsMonth < 0 || bsMonth > 11) return null;
+  return BS_MONTHS[yearIdx][bsMonth];
+}
 // AD date of BS 2000 Baishakh 1 = April 14, 1943 (verified against
 // published BS/AD reference converters; the code was already correct,
 // an earlier comment here mistakenly said April 13).
@@ -138,31 +149,28 @@ export function toLocalDateString(date) {
   return `${y}-${m}-${day}`;
 }
 
-// Convert AD date to BS
+// Convert AD date to BS. Returns null if the date falls outside the
+// supported table (BS 2000-2090 / AD 1943-2033) -- callers must treat
+// null as "cannot convert," never substitute a guessed date. An
+// out-of-range result usually means a data-entry mistake (wrong
+// century, stray digit); showing a plausible-looking wrong date would
+// hide that mistake instead of surfacing it.
 export function adToBs(adDate) {
   const ad = parseLocalDate(adDate);
-  // Days since epoch
   const epoch = new Date(AD_EPOCH);
   epoch.setHours(0,0,0,0);
   let daysDiff = Math.round((ad - epoch) / 86400000);
-
-  let bsYear = BS_START_YEAR;
-  let bsMonth = 0;
-  let bsDay = 1;
+  if (daysDiff < 0) return null;
 
   for (let y = 0; y < BS_MONTHS.length; y++) {
     for (let m = 0; m < 12; m++) {
       if (daysDiff < BS_MONTHS[y][m]) {
-        bsYear = BS_START_YEAR + y;
-        bsMonth = m;
-        bsDay = daysDiff + 1;
-        return { year: bsYear, month: bsMonth, day: bsDay };
+        return { year: BS_START_YEAR + y, month: m, day: daysDiff + 1 };
       }
       daysDiff -= BS_MONTHS[y][m];
     }
   }
-  // Fallback for dates beyond table
-  return { year: BS_START_YEAR + BS_MONTHS.length - 1, month: 11, day: 30 };
+  return null;
 }
 
 // Convert BS date to AD
@@ -185,6 +193,7 @@ export function bsToAd(bsYear, bsMonth, bsDay) {
 // Format BS date as string
 export function formatBs(adDate, lang = "en") {
   const bs = adToBs(adDate);
+  if (!bs) return lang === "np" ? "मिति उपलब्ध छैन" : "Date out of supported range";
   const monthName = lang === "np" ? BS_MONTHS_NP[bs.month] : BS_MONTHS_EN[bs.month];
   const day = lang === "np" ? toNepaliDigits(bs.day) : bs.day;
   const year = lang === "np" ? toNepaliDigits(bs.year) : bs.year;
@@ -198,9 +207,11 @@ export function formatDualDate(adDate, lang = "en") {
   return `${bs} (${ad})`;
 }
 
-// Get current BS fiscal year label e.g. "2081-82"
+// Get current BS fiscal year label e.g. "2081-82". Returns null if
+// adDate is outside the supported BS calendar range.
 export function bsFiscalYearFor(adDate = new Date()) {
   const bs = adToBs(adDate);
+  if (!bs) return null;
   // FY starts Shrawan (month index 3)
   const fyStartYear = bs.month >= 3 ? bs.year : bs.year - 1;
   const endShort = String((fyStartYear + 1) % 100).padStart(2, "0");

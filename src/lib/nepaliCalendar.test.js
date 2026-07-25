@@ -3,8 +3,12 @@ import {
   adToBs,
   bsToAd,
   bsFiscalYearFor,
+  formatBs,
+  daysInBsMonth,
   toLocalDateString,
   BS_MONTHS_EN,
+  BS_MIN_YEAR,
+  BS_MAX_YEAR,
 } from "./nepaliCalendar";
 
 // Shrawan 1, 2083 BS = July 17, 2026 AD, confirmed against an authoritative
@@ -49,6 +53,34 @@ describe("bsToAd / adToBs", () => {
   it("returns null for a BS year outside the supported table range", () => {
     expect(bsToAd(1999, 0, 1)).toBeNull();
     expect(bsToAd(2091, 0, 1)).toBeNull();
+  });
+
+  it("returns null for an AD date outside the supported table range, instead of silently clamping to a fake date", () => {
+    expect(adToBs("1900-01-01")).toBeNull();
+    expect(adToBs("2100-01-01")).toBeNull();
+  });
+});
+
+describe("out-of-range handling does not crash callers", () => {
+  it("formatBs returns a clear fallback instead of throwing when adToBs is null", () => {
+    expect(formatBs("2100-01-01")).toBe("Date out of supported range");
+    expect(formatBs("2100-01-01", "np")).toBe("मिति उपलब्ध छैन");
+  });
+
+  it("bsFiscalYearFor returns null instead of throwing when adToBs is null", () => {
+    expect(bsFiscalYearFor(new Date("2100-01-01T00:00:00"))).toBeNull();
+  });
+});
+
+describe("daysInBsMonth", () => {
+  it("returns the exact day count from the table for a real month", () => {
+    // BS 2083 Shrawan (index 3) has 32 days per the table.
+    expect(daysInBsMonth(2083, 3)).toBe(32);
+  });
+
+  it("returns null outside the supported year range, never a guessed value", () => {
+    expect(daysInBsMonth(BS_MIN_YEAR - 1, 0)).toBeNull();
+    expect(daysInBsMonth(BS_MAX_YEAR + 1, 0)).toBeNull();
   });
 });
 
