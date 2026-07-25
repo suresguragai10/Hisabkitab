@@ -70,7 +70,7 @@ function numWords(n) {
   return "NPR " + toWords(int).trim() + (dec ? ` and ${dec}/100` : "") + " Only";
 }
 
-// ── IRD-Compliant Invoice Print ───────────────────────────────
+// ── Invoice print view ─────────────────────────────────────────
 function InvoicePrint({ inv, profile, isReprint, onClose }) {
   const print = () => window.print();
   const p = profile || {};
@@ -78,6 +78,8 @@ function InvoicePrint({ inv, profile, isReprint, onClose }) {
   const bsDate = bsDisplayFull(inv.invoice_date);
   const adDate = inv.invoice_date;
   const bsDue  = inv.due_date ? bsDisplayFull(inv.due_date) : null;
+  const lineVatRates = [...new Set((inv.invoice_lines || []).map(l => Number(l.vat_rate)))];
+  const vatSummaryLabel = lineVatRates.length === 1 ? `VAT ${lineVatRates[0]}% / मूअकर` : "VAT / मूअकर";
 
   return (
     <div className="print-overlay">
@@ -170,7 +172,7 @@ function InvoicePrint({ inv, profile, isReprint, onClose }) {
             </tr>
             <tr>
               <td colSpan={5}></td>
-              <td className="r"><b>VAT 13% / मूअकर</b></td>
+              <td className="r"><b>{vatSummaryLabel}</b></td>
               <td colSpan={2}></td>
               <td className="r"><b>{Number(inv.vat_amount).toLocaleString()}</b></td>
             </tr>

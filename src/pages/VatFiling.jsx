@@ -57,8 +57,6 @@ export default function VatFiling() {
   const [err,        setErr]        = useState(null);
   const [msg,        setMsg]        = useState(null);
   const [expanded,   setExpanded]   = useState(null); // period id
-  const [filingRef,  setFilingRef]  = useState("");
-  const [filingNotes,setFilingNotes]= useState("");
 
   const load = async () => {
     setLoading(true); setErr(null);
@@ -115,24 +113,6 @@ export default function VatFiling() {
     setBusy(false);
   };
 
-  const file = async (vatReturn) => {
-    if (!filingRef.trim()) { setErr("Enter the filing reference before submitting."); return; }
-    if (!window.confirm(`File this VAT return with reference "${filingRef.trim()}"? This locks the period and cannot be undone.`)) return;
-    setBusy(true); setErr(null); setMsg(null);
-    try {
-      const { error } = await supabase.rpc("file_vat_return", {
-        p_return_id: vatReturn.id,
-        p_filing_reference: filingRef.trim(),
-        p_notes: filingNotes.trim() || null,
-      });
-      if (error) throw error;
-      setMsg("VAT return filed and the period is now locked.");
-      setFilingRef(""); setFilingNotes("");
-      await load();
-    } catch(e) { setErr(e.message); }
-    setBusy(false);
-  };
-
   const statusOf = (period) => {
     const r = returnFor(period.id);
     if (!r) return { label: "Not prepared", cls: "status-draft" };
@@ -140,7 +120,7 @@ export default function VatFiling() {
     return { label: "Draft", cls: "status-partial" };
   };
 
-  const totalFiled = returns.filter(r => r.status === "filed")
+  const totalFiled = returns.filter(r => !!r.id)
     .reduce((s, r) => s + Number(r.snapshot?.net_vat_payable || 0), 0);
 
   return (
@@ -156,19 +136,20 @@ export default function VatFiling() {
       </div>
 
       <div className="settings-info-box">
-        Each fiscal period can have one VAT return. <b>Prepare</b> creates a draft snapshot from your posted
-        invoices, credit notes, purchase bills, and debit notes — nothing is final yet. <b>File</b> permanently
-        submits it and locks the period; there is no undo, matching a real government filing.
+        Each fiscal period can have one VAT working paper. <b>Prepare</b> creates a draft snapshot from your posted
+        invoices, credit notes, purchase bills, and debit notes. <b>Export Annex 13</b> produces the party-wise
+        file for submission — HisabKitab does not file or submit to IRD directly; that step is completed
+        separately through the IRD process.
       </div>
 
-      {!canEdit && <p className="note">Only owner or accountant can prepare or file VAT returns.</p>}
+      {!canEdit && <p className="note">Only owner or accountant can prepare VAT returns.</p>}
       {err && <p className="msg err">{err}</p>}
       {msg && <p className="msg ok">{msg}</p>}
 
       <div className="stat-row">
-        <div className="stat"><span>{returns.filter(r=>r.status==="filed").length}</span>Periods Filed</div>
+        <div className="stat"><span>{returns.filter(r=>!!r.id).length}</span>Periods Prepared</div>
         <div className="stat"><span>{periods.filter(p => !returnFor(p.id)).length}</span>Periods Not Prepared</div>
-        <div className="stat"><span style={{color:"var(--rust)"}}>NPR {fmt(totalFiled)}</span>Total Filed Net VAT</div>
+        <div className="stat"><span style={{color:"var(--rust)"}}>NPR {fmt(totalFiled)}</span>Total Prepared Net VAT</div>
       </div>
 
       {loading ? <p className="note">Loading…</p> : periods.length === 0 ? (
@@ -210,16 +191,7 @@ export default function VatFiling() {
                   {expanded === p.id && r && (
                     <tr>
                       <td colSpan={6}>
-                        <VatReturnDetail
-                          vatReturn={r}
-                          canEdit={canEdit}
-                          busy={busy}
-                          filingRef={filingRef}
-                          filingNotes={filingNotes}
-                          setFilingRef={setFilingRef}
-                          setFilingNotes={setFilingNotes}
-                          onFile={() => file(r)}
-                        />
+                        <VatReturnDetail vatReturn={r} />
                       </td>
                     </tr>
                   )}
@@ -233,7 +205,7 @@ export default function VatFiling() {
   );
 }
 
-function VatReturnDetail({ vatReturn, canEdit, busy, filingRef, filingNotes, setFilingRef, setFilingNotes, onFile }) {
+function VatReturnDetail({ vatReturn }) {
   const snap = vatReturn.snapshot || {};
   const rows = snap.rows || [];
 
@@ -246,7 +218,7 @@ function VatReturnDetail({ vatReturn, canEdit, busy, filingRef, filingNotes, set
         <div className="tds-calc-row"><span>Input VAT</span><b>NPR {fmt(snap.input_vat)}</b></div>
         <div className="tds-calc-row tds-calc-total"><span>Net VAT payable</span><b>NPR {fmt(snap.net_vat_payable)}</b></div>
         <div className="tds-calc-row" style={{ color: snap.reconciled ? "var(--green2)" : "var(--rust)" }}>
-          <span>{snap.reconciled ? "✓ Reconciled with VAT ledger" : "⚠ Not reconciled — cannot file until resolved"}</span>
+          <span>{snap.reconciled ? "✓ Reconciled with VAT ledger" : "⚠ Not reconciled — resolve before exporting Annex 13"}</span>
         </div>
       </div>
 
@@ -270,23 +242,15 @@ function VatReturnDetail({ vatReturn, canEdit, busy, filingRef, filingNotes, set
         </table>
       )}
 
-      {vatReturn.status === "filed" ? (
+      {vatReturn.status === "filed" && (
         <div className="msg ok" style={{ marginTop: 12 }}>
-          Filed on {new Date(vatReturn.filed_at).toLocaleDateString()} — reference <b>{vatReturn.filing_reference}</b>
+          Historical record — filed on {new Date(vatReturn.filed_at).toLocaleDateString()}, reference <b>{vatReturn.filing_reference}</b>
           {vatReturn.notes && <div style={{ marginTop: 4, fontSize: 12 }}>{vatReturn.notes}</div>}
         </div>
-      ) : canEdit ? (
-        <div style={{ marginTop: 12 }}>
-          <b style={{ display: "block", marginBottom: 8 }}>File this VAT return</b>
-          <div className="inv-form-top">
-            <label className="fld">Filing Reference <input placeholder="IRD acknowledgement / reference no." value={filingRef} onChange={e => setFilingRef(e.target.value)} /></label>
-            <label className="fld wide-field">Notes <input placeholder="Optional" value={filingNotes} onChange={e => setFilingNotes(e.target.value)} /></label>
-          </div>
-          <button className="btn" disabled={busy || !snap.reconciled} onClick={onFile}>
-            {busy ? "Filing…" : "File to IRD"}
-          </button>
-        </div>
-      ) : null}
+      )}
+      <p className="note" style={{ marginTop: 12 }}>
+        Use <b>Export Annex 13</b> above to produce the file for this period. Submission to IRD is completed separately.
+      </p>
     </div>
   );
 }

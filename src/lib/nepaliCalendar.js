@@ -104,7 +104,9 @@ const BS_MONTHS = [
 ];
 
 const BS_START_YEAR = 2000;
-// AD date of BS 2000 Baishakh 1 = April 13, 1943
+// AD date of BS 2000 Baishakh 1 = April 14, 1943 (verified against
+// published BS/AD reference converters; the code was already correct,
+// an earlier comment here mistakenly said April 13).
 const AD_EPOCH = new Date(1943, 3, 14); // April 14, 1943 (month is 0-indexed)
 
 export const BS_MONTHS_NP = ["बैशाख","जेठ","असार","साउन","भाद्र","असोज","कार्तिक","मंसिर","पुष","माघ","फागुन","चैत्र"];
