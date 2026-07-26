@@ -537,6 +537,16 @@ grant execute on function convert_rfq_to_bill(uuid) to authenticated;
 
 -- Surface the new committed_stock column (additive) so Items/Inventory
 -- can show "available to sell" instead of just current_stock.
+--
+-- The live view has 5 more columns (average_cost, inventory_value,
+-- valuation_method, valuation_updated_at, valuation_start_date -- a
+-- later weighted-average-costing migration not reflected in
+-- phaseP3_masters.sql, confirmed live 2026-07-26 via
+-- information_schema.columns) than the repo file this was originally
+-- copied from. Every existing column below is reproduced in its
+-- live ordinal position; only committed_stock/available_stock are
+-- new, appended at the very end since CREATE OR REPLACE VIEW cannot
+-- reorder or insert columns among existing ones.
 create or replace view item_summary as
 select
   i.id,
@@ -567,8 +577,11 @@ select
   i.is_active,
   i.created_at,
   i.updated_at,
-  -- Appended at the end: CREATE OR REPLACE VIEW cannot reorder or
-  -- insert columns among existing ones, only add new ones after them.
+  i.average_cost,
+  i.inventory_value,
+  i.valuation_method,
+  i.valuation_updated_at,
+  i.valuation_start_date,
   i.committed_stock,
   (i.current_stock - i.committed_stock) as available_stock
 from inventory_items i
