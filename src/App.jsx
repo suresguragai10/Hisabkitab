@@ -1,4 +1,5 @@
 import React, { useState, useEffect, Component } from "react";
+import { HashRouter, Routes, Route, Navigate, NavLink, useNavigate, useLocation } from "react-router-dom";
 import { supabase, diagnoseAuthServer } from "./supabase";
 import { seedDefaultAccountsIfNeeded, checkRateLimit, logRateLimit, listAuditLog } from "./lib/db";
 import { getLang, setLang, t } from "./lib/i18n";
@@ -50,6 +51,7 @@ import Inventory from "./pages/Inventory";
 import Reports from "./pages/Reports";
 import Ledger from "./pages/Ledger";
 import DialogHost from "./components/DialogHost";
+import { confirmDialog, showToast } from "./lib/dialogs";
 
 // ── Root ──────────────────────────────────────────────────────
 export default function App() {
@@ -106,7 +108,11 @@ export default function App() {
       />
     );
   }
-  return <Authed session={session} lang={lang} toggleLang={toggleLang} />;
+  return (
+    <HashRouter>
+      <Authed session={session} lang={lang} toggleLang={toggleLang} />
+    </HashRouter>
+  );
 }
 
 // ── Splash ────────────────────────────────────────────────────
@@ -451,7 +457,14 @@ const ALL_TABS = NAV_SECTIONS.flatMap(s => s.tabs);
 function Authed({ session, lang, toggleLang }) {
   const userId = session.user.id;
   const [busy, setBusy] = useState(false);
-  const [tab, setTab] = useState("dashboard");
+  const location = useLocation();
+  const navigate = useNavigate();
+  // The URL is the single source of truth for which page is showing --
+  // this gives real browser Back/Forward, refresh-safe pages, and
+  // bookmarkable/shareable links (audit item 4.6), instead of the old
+  // in-memory tab state that reset to Dashboard on every reload.
+  const tab = location.pathname.replace(/^\/+/, "") || "dashboard";
+  const goTab = (key) => navigate("/" + key);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [seeding, setSeeding] = useState(true);
   const [seedErr, setSeedErr] = useState(null);
@@ -471,12 +484,12 @@ function Authed({ session, lang, toggleLang }) {
     const token = new URLSearchParams(window.location.search).get("invite");
     if (!token) return;
     workspace.acceptInvite(token)
-      .then(biz => {
-        alert("Welcome! You now have access to " + biz + ". Reloading…");
+      .then(async biz => {
+        await confirmDialog(`Welcome! You now have access to ${biz}.`, { confirmLabel: "Continue" });
         window.history.replaceState({}, "", window.location.pathname);
         window.location.reload();
       })
-      .catch(e => alert("Invite error: " + e.message));
+      .catch(e => showToast("Invite error: " + e.message, "error"));
   }, []); // eslint-disable-line
 
   useEffect(() => {
@@ -516,12 +529,12 @@ function Authed({ session, lang, toggleLang }) {
               <div key={sec.section} className="sidebar-section">
                 <div className="sidebar-section-title">{sec.section}</div>
                 {visibleTabs.map(tk => (
-                  <button key={tk.key}
-                    className={"sidebar-item" + (tab === tk.key ? " active" : "")}
-                    onClick={() => { setTab(tk.key); setSidebarOpen(false); }}>
+                  <NavLink key={tk.key} to={"/" + tk.key}
+                    className={({ isActive }) => "sidebar-item" + (isActive ? " active" : "")}
+                    onClick={() => setSidebarOpen(false)}>
                     <span className="sidebar-item-icon">{tk.icon}</span>
                     <span>{tk.label || t(tk.i18n, lang)}</span>
-                  </button>
+                  </NavLink>
                 ))}
               </div>
             );
@@ -558,39 +571,43 @@ function Authed({ session, lang, toggleLang }) {
 
       {/* Setup wizard overlay — shown for new users before they start */}
       {!seeding && onboarding === true && (
-        <SetupWizard onComplete={(navTo) => { setOnboarding(false); if(navTo) setTab(navTo); }} />
+        <SetupWizard onComplete={(navTo) => { setOnboarding(false); if(navTo) goTab(navTo); }} />
       )}
       <main className="app-main app-main-sidebar">
         {seeding && <p className="note">{t("loading", lang)}</p>}
         {seedErr && <p className="msg err">Couldn't set up default accounts: {seedErr}</p>}
         {!seeding && (
           <TabErrorBoundary key={tab}>
-            {tab === "dashboard" && <Dashboard refreshKey={refreshKey} lang={lang} onNav={setTab} />}
-            {tab === "invoices" && <Invoices userId={userId} lang={lang} />}
-            {tab === "purchases" && <Purchases userId={userId} lang={lang} />}
-            {tab === "inventory" && <Inventory userId={userId} lang={lang} />}
-            {tab === "reports" && <Reports lang={lang} />}
-            {tab === "vouchers" && (
-              <>
-                <VoucherEntry userId={userId} onSaved={bump} lang={lang} />
-                <VoucherList refreshKey={refreshKey} lang={lang} />
-              </>
-            )}
-            {tab === "ledger" && <Ledger lang={lang} />}
-            {/* P3 Masters — new unified pages */}
-            {tab === "contacts"   && <Contacts userId={userId} onChanged={bump} lang={lang} />}
-            {tab === "items"      && <Items onChanged={bump} lang={lang} />}
-            {tab === "categories" && <ItemCategories onChanged={bump} lang={lang} />}
-            {/* Kept for backward-compat during migration — no nav entry */}
-            {tab === "parties" && <Parties userId={userId} onChanged={bump} lang={lang} />}
-            {tab === "accounts" && <ChartOfAccounts userId={userId} onChanged={bump} lang={lang} />}
-            {tab === "vat"   && <VatFiling />}
-            {tab === "tds"   && <TDS userId={userId} />}
-            {tab === "notes"     && <CreditDebitNotes />}
-            {tab === "recon"     && <BankReconciliation />}
-            {tab === "settings"  && <Settings />}
-            {tab === "team" && <TeamMembers />}
-            {tab === "audit" && <AuditLog lang={lang} />}
+            <Routes>
+              <Route path="/" element={<Navigate to="/dashboard" replace />} />
+              <Route path="/dashboard" element={<Dashboard refreshKey={refreshKey} lang={lang} onNav={goTab} />} />
+              <Route path="/invoices" element={<Invoices userId={userId} lang={lang} />} />
+              <Route path="/purchases" element={<Purchases userId={userId} lang={lang} />} />
+              <Route path="/inventory" element={<Inventory userId={userId} lang={lang} />} />
+              <Route path="/reports" element={<Reports lang={lang} />} />
+              <Route path="/vouchers" element={
+                <>
+                  <VoucherEntry userId={userId} onSaved={bump} lang={lang} />
+                  <VoucherList refreshKey={refreshKey} lang={lang} />
+                </>
+              } />
+              <Route path="/ledger" element={<Ledger lang={lang} />} />
+              {/* P3 Masters — new unified pages */}
+              <Route path="/contacts" element={<Contacts userId={userId} onChanged={bump} lang={lang} />} />
+              <Route path="/items" element={<Items onChanged={bump} lang={lang} />} />
+              <Route path="/categories" element={<ItemCategories onChanged={bump} lang={lang} />} />
+              {/* Kept for backward-compat during migration — no nav entry */}
+              <Route path="/parties" element={<Parties userId={userId} onChanged={bump} lang={lang} />} />
+              <Route path="/accounts" element={<ChartOfAccounts userId={userId} onChanged={bump} lang={lang} />} />
+              <Route path="/vat" element={<VatFiling />} />
+              <Route path="/tds" element={<TDS userId={userId} />} />
+              <Route path="/notes" element={<CreditDebitNotes />} />
+              <Route path="/recon" element={<BankReconciliation />} />
+              <Route path="/settings" element={<Settings />} />
+              <Route path="/team" element={<TeamMembers />} />
+              <Route path="/audit" element={<AuditLog lang={lang} />} />
+              <Route path="*" element={<Navigate to="/dashboard" replace />} />
+            </Routes>
           </TabErrorBoundary>
         )}
       </main>
@@ -803,7 +820,7 @@ function Style() {
   .sidebar-nav{flex:1;overflow-y:auto;padding:12px 10px}
   .sidebar-section{margin-bottom:14px}
   .sidebar-section-title{font-size:10.5px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:#d4cdb8;opacity:.7;padding:6px 10px 4px}
-  .sidebar-item{display:flex;align-items:center;gap:10px;width:100%;text-align:left;background:transparent;border:none;color:#e8e3d3;padding:9px 10px;border-radius:8px;cursor:pointer;font-size:13.5px;margin-bottom:2px;transition:background .12s}
+  .sidebar-item{display:flex;align-items:center;gap:10px;width:100%;text-align:left;background:transparent;border:none;color:#e8e3d3;padding:9px 10px;border-radius:8px;cursor:pointer;font-size:13.5px;margin-bottom:2px;transition:background .12s;text-decoration:none}
   .sidebar-item:hover{background:#ffffff14}
   .sidebar-item.active{background:#f3efe2;color:var(--green2);font-weight:700}
   .sidebar-item-icon{font-size:15px;width:18px;text-align:center;flex-shrink:0}
