@@ -411,16 +411,27 @@ function SetPassword({ onDone, recovery = false }) {
 }
 
 // ── Main app ──────────────────────────────────────────────────
+// Grouping follows the audit's recommended sidebar (docs/AUDIT_TRACKER.md
+// section 3): Banking and Tax & Compliance split out of Accounting/Reports,
+// Audit Log moved under Settings. Contacts stays unified (one page already
+// handles customer/vendor/both) rather than forced into separate
+// Customers/Suppliers entries, since that split doesn't match how parties
+// are actually modeled here. Credit/Debit Notes gets two nav entries
+// (Sales and Purchases) pointing at the same page via `route`, since one
+// shared page correctly handles both but the audit's complaint --
+// "purchase debit notes may follow a different workflow" than sales
+// credit notes -- is about *findability*, not the page itself.
 const NAV_SECTIONS = [
   { section: "Overview", tabs: [
     { key: "dashboard", i18n: "dashboard", icon: "🏠", access: ()=>true },
   ]},
   { section: "Sales", tabs: [
     { key: "invoices",  i18n: "invoices",  icon: "🧾", access: ()=>true },
-    { key: "notes",     i18n: "notes",     icon: "↩",  label: "Credit/Debit Notes", access: r=>["owner","accountant","staff"].includes(r) },
+    { key: "notes-cn",  route: "notes", i18n: "notes", icon: "↩",  label: "Credit Notes", access: r=>["owner","accountant","staff"].includes(r) },
   ]},
   { section: "Purchases", tabs: [
     { key: "purchases", i18n: "purchases", icon: "🛒", access: ()=>true },
+    { key: "notes-dn",  route: "notes", i18n: "notes", icon: "↩",  label: "Debit Notes", access: r=>["owner","accountant","staff"].includes(r) },
   ]},
   // P3 Masters Unification — "Contacts" replaces "Parties" and gets its
   // own section. "Items" splits from Inventory: the master lives here,
@@ -433,21 +444,25 @@ const NAV_SECTIONS = [
     { key: "categories",  i18n: "categories",  icon: "🗂",  label: "Categories", access: ()=>true },
     { key: "inventory",   i18n: "inventory",   icon: "📦",  access: ()=>true },
   ]},
+  { section: "Banking", tabs: [
+    { key: "recon", i18n: "recon", icon: "🏦", label: "Bank Reconciliation", access: r=>["owner","accountant"].includes(r) },
+  ]},
   { section: "Accounting", tabs: [
     { key: "vouchers", i18n: "vouchers",        icon: "📝", access: r=>["owner","accountant"].includes(r) },
     { key: "ledger",   i18n: "ledger",          icon: "📖", access: r=>["owner","accountant","viewer"].includes(r) },
     { key: "accounts", i18n: "chartOfAccounts", icon: "📚", label: "Chart of Accounts", access: r=>["owner","accountant"].includes(r) },
-    { key: "recon",    i18n: "recon",           icon: "🏦", label: "Bank Reconciliation", access: r=>["owner","accountant"].includes(r) },
   ]},
-  { section: "Reports & Compliance", tabs: [
+  { section: "Reports", tabs: [
     { key: "reports", i18n: "reports", icon: "📊", access: r=>["owner","accountant","viewer"].includes(r) },
-    { key: "vat",     i18n: "vat",     icon: "🧾", label: "VAT Filing", access: r=>["owner","accountant","viewer"].includes(r) },
-    { key: "tds",     i18n: "tds",     icon: "📋", label: "TDS", access: r=>["owner","accountant"].includes(r) },
-    { key: "audit",   i18n: "auditLog", icon: "🔒", label: "Audit Log", access: r=>["owner","accountant"].includes(r) },
   ]},
-  { section: "Admin", tabs: [
+  { section: "Tax & Compliance", tabs: [
+    { key: "vat", i18n: "vat", icon: "🧾", label: "VAT Filing", access: r=>["owner","accountant","viewer"].includes(r) },
+    { key: "tds", i18n: "tds", icon: "📋", label: "TDS", access: r=>["owner","accountant"].includes(r) },
+  ]},
+  { section: "Settings", tabs: [
     { key: "team",     i18n: "team",     icon: "🧑‍💼", label: "Team", access: r=>r==="owner" },
     { key: "settings", i18n: "settings", icon: "⚙",  label: "Settings", access: r=>["owner","accountant"].includes(r) },
+    { key: "audit",    i18n: "auditLog", icon: "🔒", label: "Audit Log", access: r=>["owner","accountant"].includes(r) },
   ]},
 ];
 
@@ -529,7 +544,7 @@ function Authed({ session, lang, toggleLang }) {
               <div key={sec.section} className="sidebar-section">
                 <div className="sidebar-section-title">{sec.section}</div>
                 {visibleTabs.map(tk => (
-                  <NavLink key={tk.key} to={"/" + tk.key}
+                  <NavLink key={tk.key} to={"/" + (tk.route || tk.key)}
                     className={({ isActive }) => "sidebar-item" + (isActive ? " active" : "")}
                     onClick={() => setSidebarOpen(false)}>
                     <span className="sidebar-item-icon">{tk.icon}</span>
