@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { supabase } from "../supabase";
 import { listParties } from "../lib/db";
 import { currentFiscalYear } from "../lib/fiscalYear";
@@ -21,7 +21,7 @@ const blankLine = () => ({ itemId: "", description: "", quantity: "1", unit: "pc
 async function listInvoices() {
   const { data, error } = await supabase
     .from("invoices")
-    .select("*, invoice_lines(*)")
+    .select("*, invoice_lines(*), sales_orders(order_number, fiscal_year)")
     .order("invoice_date", { ascending: false });
   if (error) throw error;
   return data;
@@ -618,7 +618,16 @@ export default function Invoices() {
                 const lifecycle = lifecycleOf(invoice);
                 return (
                   <tr key={invoice.id}>
-                    <td>{invoice.fiscal_year}-{String(invoice.invoice_number).padStart(4, "0")}</td>
+                    <td>
+                      {invoice.fiscal_year}-{String(invoice.invoice_number).padStart(4, "0")}
+                      {invoice.sales_order_id && invoice.sales_orders && (
+                        <div style={{ fontSize: 11 }}>
+                          <Link to={`/sales-orders?highlight=${invoice.sales_order_id}`}>
+                            From SO-{invoice.sales_orders.fiscal_year}-{String(invoice.sales_orders.order_number).padStart(4, "0")} →
+                          </Link>
+                        </div>
+                      )}
+                    </td>
                     <td><span>{invoice.invoice_date_bs || adDateToBsString(invoice.invoice_date)}</span><span className="muted" style={{ fontSize: 11, display: "block" }}>{invoice.invoice_date} AD</span></td>
                     <td>{invoice.party_name}</td>
                     <td><span className={`status-${lifecycle}`}>{lifecycle}</span></td>

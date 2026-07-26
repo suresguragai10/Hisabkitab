@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { supabase } from "../supabase";
 import { listParties } from "../lib/db";
 import { currentFiscalYear } from "../lib/fiscalYear";
@@ -31,7 +31,7 @@ async function fetchItems() {
 async function listBills() {
   const { data, error } = await supabase
     .from("purchase_bills")
-    .select("*, purchase_bill_lines(*)")
+    .select("*, purchase_bill_lines(*), purchase_quotations(rfq_number, fiscal_year)")
     .order("bill_date", { ascending: false });
   if (error) throw error;
   return data;
@@ -420,7 +420,16 @@ export default function Purchases() {
                 const lifecycle = lifecycleOf(bill);
                 return (
                   <tr key={bill.id}>
-                    <td>{bill.fiscal_year}-PB-{String(bill.bill_number).padStart(4, "0")}</td>
+                    <td>
+                      {bill.fiscal_year}-PB-{String(bill.bill_number).padStart(4, "0")}
+                      {bill.rfq_id && bill.purchase_quotations && (
+                        <div style={{ fontSize: 11 }}>
+                          <Link to={`/rfq?highlight=${bill.rfq_id}`}>
+                            From RFQ-{bill.purchase_quotations.fiscal_year}-{String(bill.purchase_quotations.rfq_number).padStart(4, "0")} →
+                          </Link>
+                        </div>
+                      )}
+                    </td>
                     <td>{bill.bill_date}</td>
                     <td>{bill.vendor_name}</td>
                     <td><span className={`status-${lifecycle}`}>{lifecycle}</span></td>

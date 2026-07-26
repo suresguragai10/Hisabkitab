@@ -5,8 +5,8 @@
 // cancelled), just mirrored across the sales/purchase side. Each
 // still gets its own route/nav entry -- pass docType="so"|"rfq".
 // ============================================================
-import React, { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import React, { useEffect, useRef, useState } from "react";
+import { Link, useSearchParams } from "react-router-dom";
 import { supabase } from "../supabase";
 import { listParties } from "../lib/db";
 import { currentFiscalYear } from "../lib/fiscalYear";
@@ -41,6 +41,9 @@ async function fetchItems() {
 }
 
 export default function SalesOrdersRFQ({ docType, lang = "en" }) {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const highlightId = searchParams.get("highlight");
+  const highlightRef = useRef(null);
   const isSO = docType === "so";
   const partyRole = isSO ? "customer" : "vendor";
   const table = isSO ? "sales_orders" : "purchase_quotations";
@@ -93,6 +96,16 @@ export default function SalesOrdersRFQ({ docType, lang = "en" }) {
   };
 
   useEffect(() => { load(); }, [docType]); // eslint-disable-line
+
+  // Arriving via a "From SO-.../From RFQ-..." link on the Invoice/Bill
+  // page (?highlight=<id>) scrolls to and briefly highlights that
+  // exact row instead of leaving the user to find it in the list.
+  useEffect(() => {
+    if (!highlightId || docs.length === 0) return;
+    highlightRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+    const timer = setTimeout(() => setSearchParams({}, { replace: true }), 2500);
+    return () => clearTimeout(timer);
+  }, [docs, highlightId]); // eslint-disable-line
 
   const resetForm = () => {
     setEditingId(null); setPartyId(""); setPartyName(""); setPartyAddress(""); setPartyPan("");
@@ -279,7 +292,8 @@ export default function SalesOrdersRFQ({ docType, lang = "en" }) {
             <thead><tr><th>#</th><th>Date</th><th>{partyLabel}</th><th className="num">Total</th><th>Status</th><th /></tr></thead>
             <tbody>
               {docs.map((doc) => (
-                <tr key={doc.id}>
+                <tr key={doc.id} ref={doc.id === highlightId ? highlightRef : null}
+                    style={doc.id === highlightId ? { background: "var(--gold-light, #fff3cd)" } : undefined}>
                   <td><b>{prefix}-{doc.fiscal_year}-{String(doc[numberField]).padStart(4, "0")}</b></td>
                   <td>{doc[dateField]}</td>
                   <td>{isSO ? doc.party_name : doc.vendor_name}</td>
