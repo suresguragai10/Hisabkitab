@@ -60,6 +60,11 @@ export default function Dashboard({ refreshKey, onNav }) {
     ? Math.ceil((new Date(stats.vat_deadline) - new Date()) / 86400000)
     : null;
 
+  const hasComplianceAlerts = stats && (
+    stats.bills_due_soon_count > 0 || stats.bills_overdue_count > 0 ||
+    stats.tds_pending > 0.005 || stats.bank_unreconciled > 0 || stats.negative_stock_count > 0
+  );
+
   return (
     <div className="panel">
       <div className="panel-head">
@@ -143,7 +148,66 @@ export default function Dashboard({ refreshKey, onNav }) {
               color={stats.low_stock > 0 ? "gold" : "neutral"}
               icon="📦"
             />
+            {stats.gross_margin_pct != null && (
+              <DashCard
+                label="Gross Margin"
+                value={stats.gross_margin_pct + "%"}
+                sub="This month, sales vs. COGS"
+                color={stats.gross_margin_pct >= 20 ? "green" : stats.gross_margin_pct >= 0 ? "gold" : "rust"}
+                icon="📐"
+              />
+            )}
           </div>
+
+          {/* ── Row 3: Payables & compliance ── */}
+          {hasComplianceAlerts && <div className="dash-section-title" style={{marginTop:20}}>Payables & Compliance</div>}
+          {hasComplianceAlerts && <div className="dash-cards">
+            {stats.bills_due_soon_count > 0 && (
+              <DashCard
+                label="Bills Due Soon"
+                value={stats.bills_due_soon_count}
+                sub={`NPR ${fmtK(stats.bills_due_soon_amount)} due within 7 days`}
+                color="gold"
+                icon="📅"
+              />
+            )}
+            {stats.bills_overdue_count > 0 && (
+              <DashCard
+                label="Bills Overdue"
+                value={stats.bills_overdue_count}
+                sub={`NPR ${fmtK(stats.bills_overdue_amount)} past due`}
+                color="rust"
+                icon="⚠"
+              />
+            )}
+            {stats.tds_pending > 0.005 && (
+              <DashCard
+                label="TDS Pending"
+                value={"NPR " + fmtK(stats.tds_pending)}
+                sub="Deducted, not yet remitted"
+                color="gold"
+                icon="🧾"
+              />
+            )}
+            {stats.bank_unreconciled > 0 && (
+              <DashCard
+                label="Bank Unreconciled"
+                value={stats.bank_unreconciled}
+                sub="Statement line(s) awaiting match"
+                color="gold"
+                icon="🏦"
+              />
+            )}
+            {stats.negative_stock_count > 0 && (
+              <DashCard
+                label="Negative Stock"
+                value={stats.negative_stock_count}
+                sub="Item(s) below zero — needs a look"
+                color="rust"
+                icon="🚫"
+              />
+            )}
+          </div>}
 
           {/* ── Quick actions ── */}
           <div className="dash-section-title" style={{marginTop:20}}>Quick Actions</div>
@@ -157,7 +221,25 @@ export default function Dashboard({ refreshKey, onNav }) {
           </div>
 
           {/* ── Recent activity ── */}
-          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16,marginTop:20}}>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit, minmax(220px, 1fr))",gap:16,marginTop:20}}>
+            {/* Top overdue customers */}
+            {stats.top_overdue_customers?.length > 0 && (
+              <div>
+                <div className="dash-section-title">Top Overdue Customers</div>
+                <table className="tbl">
+                  <thead><tr><th>Customer</th><th className="num">Overdue</th></tr></thead>
+                  <tbody>
+                    {stats.top_overdue_customers.map((c,idx)=>(
+                      <tr key={idx}>
+                        <td style={{fontSize:12,maxWidth:120,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{c.party_name}</td>
+                        <td className="num" style={{fontSize:12,color:"var(--rust)"}}>NPR {Number(c.amount).toLocaleString()}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
             {/* Recent invoices */}
             <div>
               <div className="dash-section-title">Recent Invoices</div>
