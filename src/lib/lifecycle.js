@@ -96,6 +96,46 @@ export function deleteAttachment(attachmentId) {
   return callRpc("delete_document_attachment", { p_attachment_id: attachmentId });
 }
 
+export function saveSalesOrderDraft(header, lines, orderId = null) {
+  return callRpc("save_sales_order_draft", {
+    p_header: header,
+    p_lines: lines,
+    p_order_id: orderId,
+  });
+}
+
+export function confirmSalesOrder(orderId) {
+  return callRpc("confirm_sales_order", { p_order_id: orderId });
+}
+
+export function cancelSalesOrder(orderId, reason) {
+  return callRpc("cancel_sales_order", { p_order_id: orderId, p_reason: reason });
+}
+
+export function convertSalesOrderToInvoice(orderId) {
+  return callRpc("convert_sales_order_to_invoice", { p_order_id: orderId });
+}
+
+export function saveRfqDraft(header, lines, rfqId = null) {
+  return callRpc("save_rfq_draft", {
+    p_header: header,
+    p_lines: lines,
+    p_rfq_id: rfqId,
+  });
+}
+
+export function sendRfq(rfqId) {
+  return callRpc("send_rfq", { p_rfq_id: rfqId });
+}
+
+export function cancelRfq(rfqId, reason) {
+  return callRpc("cancel_rfq", { p_rfq_id: rfqId, p_reason: reason });
+}
+
+export function convertRfqToBill(rfqId) {
+  return callRpc("convert_rfq_to_bill", { p_rfq_id: rfqId });
+}
+
 export async function listDocumentActivity(documentType, documentId) {
   const [notesResult, attachmentsResult] = await Promise.all([
     supabase

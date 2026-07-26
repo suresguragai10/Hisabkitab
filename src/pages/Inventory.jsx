@@ -333,7 +333,11 @@ export default function Inventory() {
                   <td><b>{i.name}</b>{i.sku && <div className="muted" style={{ fontSize: 11 }}>{i.sku}</div>}</td>
                   <td className="muted">{i.category_name || "—"}</td>
                   <td>{i.unit}</td>
-                  <td className={`num${i.is_low_stock ? " low-stock-val" : ""}`}><b>{fmt(i.current_stock, 3)}</b></td>
+                  <td className={`num${i.is_low_stock ? " low-stock-val" : ""}`}>
+                    <b>{fmt(i.current_stock, 3)}</b>
+                    {Number(i.committed_stock) > 0 &&
+                      <div className="muted" style={{ fontSize: 11 }}>{fmt(i.committed_stock, 3)} committed · {fmt(i.available_stock, 3)} available</div>}
+                  </td>
                   <td className="num">{fmt(i.average_cost ?? i.purchase_price, 2)}</td>
                   <td className="num"><b>{fmt(i.inventory_value)}</b></td>
                   <td className="num muted">{fmt(i.reorder_level, 3)}</td>

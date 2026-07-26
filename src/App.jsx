@@ -50,6 +50,7 @@ import Purchases from "./pages/Purchases";
 import Inventory from "./pages/Inventory";
 import Reports from "./pages/Reports";
 import Ledger from "./pages/Ledger";
+import SalesOrdersRFQ from "./pages/SalesOrdersRFQ";
 import DialogHost from "./components/DialogHost";
 import { confirmDialog, showToast } from "./lib/dialogs";
 
@@ -426,10 +427,12 @@ const NAV_SECTIONS = [
     { key: "dashboard", i18n: "dashboard", icon: "🏠", access: ()=>true },
   ]},
   { section: "Sales", tabs: [
+    { key: "sales-orders", i18n: "salesOrders", icon: "📑", label: "Sales Orders", access: ()=>true },
     { key: "invoices",  i18n: "invoices",  icon: "🧾", access: ()=>true },
     { key: "notes-cn",  route: "notes", i18n: "notes", icon: "↩",  label: "Credit Notes", access: r=>["owner","accountant","staff"].includes(r) },
   ]},
   { section: "Purchases", tabs: [
+    { key: "rfq", i18n: "rfq", icon: "📑", label: "RFQ / Quotations", access: ()=>true },
     { key: "purchases", i18n: "purchases", icon: "🛒", access: ()=>true },
     { key: "notes-dn",  route: "notes", i18n: "notes", icon: "↩",  label: "Debit Notes", access: r=>["owner","accountant","staff"].includes(r) },
   ]},
@@ -596,7 +599,9 @@ function Authed({ session, lang, toggleLang }) {
             <Routes>
               <Route path="/" element={<Navigate to="/dashboard" replace />} />
               <Route path="/dashboard" element={<Dashboard refreshKey={refreshKey} lang={lang} onNav={goTab} />} />
+              <Route path="/sales-orders" element={<SalesOrdersRFQ docType="so" lang={lang} />} />
               <Route path="/invoices" element={<Invoices userId={userId} lang={lang} />} />
+              <Route path="/rfq" element={<SalesOrdersRFQ docType="rfq" lang={lang} />} />
               <Route path="/purchases" element={<Purchases userId={userId} lang={lang} />} />
               <Route path="/inventory" element={<Inventory userId={userId} lang={lang} />} />
               <Route path="/reports" element={<Reports lang={lang} />} />
@@ -749,7 +754,8 @@ function Style() {
   .inv-lines-tbl input{font-size:13px;padding:6px 8px}
   .status-draft{color:#9a9483}
   .status-posted{color:var(--green2);font-weight:700}
-  .status-sent,.status-open{color:var(--gold)}
+  .status-sent,.status-open,.status-confirmed{color:var(--gold)}
+  .status-converted{color:var(--green2);font-weight:700}
   .status-partial{color:#a66b00;font-weight:700}
   .status-overdue{color:var(--rust);font-weight:700}
   .status-paid{color:var(--green2);font-weight:700}

@@ -3,7 +3,7 @@ import { supabase } from "../supabase";
 export async function listInventoryItems() {
   const { data, error } = await supabase
     .from("item_summary")
-    .select("id,name,sku,category_name,unit,track_inventory,item_type,current_stock,reorder_level,average_cost,purchase_price,inventory_value,is_low_stock,is_active")
+    .select("id,name,sku,category_name,unit,track_inventory,item_type,current_stock,committed_stock,available_stock,reorder_level,average_cost,purchase_price,inventory_value,is_low_stock,is_active")
     .eq("track_inventory", true)
     .eq("item_type", "goods")
     .order("name");

@@ -404,6 +404,8 @@ export default function Items({ onChanged }) {
                       <div style={{ fontWeight: 600, color: r.is_low_stock ? "var(--rust,#a4442d)" : "inherit" }}>
                         {fmt(r.current_stock)} {r.unit}
                       </div>
+                      {Number(r.committed_stock) > 0 &&
+                        <div className="muted" style={{ fontSize: 11 }}>{fmt(r.committed_stock)} committed · {fmt(r.available_stock)} available</div>}
                       {r.reorder_level > 0 &&
                         <div className="muted" style={{ fontSize: 11 }}>reorder ≤ {fmt(r.reorder_level)}</div>}
                       {r.is_low_stock &&
