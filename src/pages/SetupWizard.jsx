@@ -33,7 +33,7 @@ function Step1({ value, onChange, onNext }) {
   return (
     <div className="wizard-body">
       <div className="wizard-welcome">
-        <div className="wizard-logo"><span>हिसाब</span>KitabHisabKitab</div>
+        <div className="wizard-logo"><span>हिसाब</span>HisabKitab</div>
         <h2>Welcome! Let's set up your books.</h2>
         <p className="muted">It takes about 2 minutes. What type of business is this?</p>
       </div>
