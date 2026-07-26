@@ -107,7 +107,7 @@ function InvoicePrint({ inv, profile, isReprint, onClose }) {
             <div className="inv-title-sub">कर बीजक</div>
             {isReprint && (
               <div style={{fontSize:11,color:"var(--rust)",marginTop:4,fontWeight:700}}>
-                COPY OF ORIGINAL — Print {inv.reprint_count}
+                COPY OF ORIGINAL / सक्कलको प्रतिलिपि — Print {inv.reprint_count}
               </div>
             )}
           </div>
@@ -132,7 +132,7 @@ function InvoicePrint({ inv, profile, isReprint, onClose }) {
             </div>
             {bsDue && (
               <div style={{marginTop:4}}>
-                <span>Due Date:</span>
+                <span>Due Date / भुक्तानी मिति:</span>
                 <b style={{marginLeft:8}}>{bsDue}</b>
                 <span style={{fontSize:11,color:"#666",display:"block",textAlign:"right"}}>({inv.due_date} AD)</span>
               </div>
@@ -144,10 +144,10 @@ function InvoicePrint({ inv, profile, isReprint, onClose }) {
         <table className="inv-table">
           <thead>
             <tr>
-              <th>#</th><th>Description / विवरण</th><th>Unit</th>
-              <th className="r">Qty</th><th className="r">Rate</th>
-              <th className="r">Amount</th><th className="r">VAT%</th>
-              <th className="r">VAT</th><th className="r">Total</th>
+              <th>#</th><th>Description / विवरण</th><th>Unit / इकाई</th>
+              <th className="r">Qty / परिमाण</th><th className="r">Rate / दर</th>
+              <th className="r">Amount / रकम</th><th className="r">VAT% / भ्याट%</th>
+              <th className="r">VAT / भ्याट</th><th className="r">Total / जम्मा</th>
             </tr>
           </thead>
           <tbody>
@@ -189,10 +189,10 @@ function InvoicePrint({ inv, profile, isReprint, onClose }) {
 
         {/* ── Amount in words ── */}
         <div className="inv-words">
-          <b>Amount in words:</b> {numWords(Number(inv.total))}
+          <b>Amount in words / अक्षरमा रकम:</b> {numWords(Number(inv.total))}
         </div>
 
-        {inv.notes && <div className="inv-notes"><b>Notes:</b> {inv.notes}</div>}
+        {inv.notes && <div className="inv-notes"><b>Notes / कैफियत:</b> {inv.notes}</div>}
 
         {/* ── Footer ── */}
         <div className="inv-footer">
@@ -200,8 +200,8 @@ function InvoicePrint({ inv, profile, isReprint, onClose }) {
             <div className="inv-sign"><div className="inv-sign-line"></div><div>Customer Signature / ग्राहकको हस्ताक्षर</div></div>
           </div>
           <div style={{textAlign:"center",fontSize:11,color:"#888"}}>
-            <div>This is a computer-generated invoice.</div>
-            {isReprint && <div style={{color:"var(--rust)",fontWeight:600,marginTop:4}}>This is a copy — not an original invoice.</div>}
+            <div>This is a computer-generated invoice / यो कम्प्युटर-निर्मित बिजक हो।</div>
+            {isReprint && <div style={{color:"var(--rust)",fontWeight:600,marginTop:4}}>This is a copy — not an original invoice / यो प्रतिलिपि हो, सक्कल बिजक होइन।</div>}
           </div>
           <div>
             <div className="inv-sign"><div className="inv-sign-line"></div><div>Authorised Signature / अधिकृत हस्ताक्षर</div></div>

@@ -36,25 +36,25 @@ function NotePrint({ note, noteType, profile, onClose }) {
           <div style={{ textAlign: "right", fontSize: 12, color: "#555" }}>
             <div className="inv-title" style={{ fontSize: 16 }}>{credit ? "CREDIT NOTE" : "DEBIT NOTE"}</div>
             <div className="inv-title-sub">{credit ? "क्रेडिट नोट (बिक्री फिर्ता)" : "डेबिट नोट (खरिद फिर्ता)"}</div>
-            <div style={{ marginTop: 6 }}><b>No:</b> {credit ? "CN" : "DN"}-{String(number).padStart(4, "0")}</div>
-            <div><b>Date:</b> {date}</div>
-            <div><b>FY:</b> {note.fiscal_year}</div>
+            <div style={{ marginTop: 6 }}><b>No / नं:</b> {credit ? "CN" : "DN"}-{String(number).padStart(4, "0")}</div>
+            <div><b>Date / मिति:</b> {date}</div>
+            <div><b>FY / आ.व.:</b> {note.fiscal_year}</div>
           </div>
         </div>
         <div className="inv-meta">
           <div className="inv-meta-left">
-            <div style={{ fontWeight: 600 }}>{credit ? "Customer" : "Vendor"}:</div>
+            <div style={{ fontWeight: 600 }}>{credit ? "Customer / ग्राहक" : "Vendor / आपूर्तिकर्ता"}:</div>
             <div style={{ fontSize: 15, fontWeight: 700 }}>{party}</div>
             {(credit ? note.party_address : note.vendor_address) && <div style={{ fontSize: 12 }}>{credit ? note.party_address : note.vendor_address}</div>}
             {(credit ? note.party_pan : note.vendor_pan) && <div style={{ fontSize: 12 }}>PAN: {credit ? note.party_pan : note.vendor_pan}</div>}
           </div>
           <div className="inv-meta-right">
-            <div style={{ fontSize: 12 }}>{credit ? `Against Invoice #${note.invoice_number}` : `Against Bill #${note.bill_number}`}</div>
-            <div style={{ fontSize: 12 }}><b>Reason:</b> {note.reason}</div>
+            <div style={{ fontSize: 12 }}>{credit ? `Against Invoice / बीजक विरुद्ध #${note.invoice_number}` : `Against Bill / बिल विरुद्ध #${note.bill_number}`}</div>
+            <div style={{ fontSize: 12 }}><b>Reason / कारण:</b> {note.reason}</div>
           </div>
         </div>
         <table className="inv-table" style={{ marginTop: 16 }}>
-          <thead><tr><th>#</th><th>Description</th><th>Qty</th><th>Unit</th><th className="r">Rate</th><th className="r">Amount</th><th className="r">VAT</th><th className="r">Total</th></tr></thead>
+          <thead><tr><th>#</th><th>Description / विवरण</th><th>Qty / परिमाण</th><th>Unit / इकाई</th><th className="r">Rate / दर</th><th className="r">Amount / रकम</th><th className="r">VAT / भ्याट</th><th className="r">Total / जम्मा</th></tr></thead>
           <tbody>
             {lines.map((line, index) => (
               <tr key={line.id || index}>
@@ -66,11 +66,11 @@ function NotePrint({ note, noteType, profile, onClose }) {
           </tbody>
         </table>
         <div className="inv-summary">
-          <div className="inv-summary-row"><span>Subtotal</span><span>NPR {fmt(note.subtotal)}</span></div>
-          <div className="inv-summary-row"><span>VAT reversed</span><span>NPR {fmt(note.vat_amount)}</span></div>
-          <div className="inv-summary-row inv-grand"><span>TOTAL</span><span>NPR {fmt(note.total)}</span></div>
+          <div className="inv-summary-row"><span>Subtotal / उप-जम्मा</span><span>NPR {fmt(note.subtotal)}</span></div>
+          <div className="inv-summary-row"><span>VAT reversed / फिर्ता भ्याट</span><span>NPR {fmt(note.vat_amount)}</span></div>
+          <div className="inv-summary-row inv-grand"><span>TOTAL / कुल जम्मा</span><span>NPR {fmt(note.total)}</span></div>
         </div>
-        {note.notes && <div className="inv-notes"><b>Notes:</b> {note.notes}</div>}
+        {note.notes && <div className="inv-notes"><b>Notes / कैफियत:</b> {note.notes}</div>}
       </div>
     </div>
   );

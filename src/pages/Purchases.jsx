@@ -51,7 +51,7 @@ function BillPrint({ bill, bizName, profile, onClose }) {
             <div className="inv-biz-name">{bizName || "Your Business"}</div>
             {profile?.address && <div className="inv-biz-sub">{profile.address}{profile.city ? ", "+profile.city : ""}</div>}
             {profile?.pan_vat && <div className="inv-biz-sub">PAN/VAT: {profile.pan_vat}</div>}
-            <div className="inv-biz-sub">Purchase Record</div>
+            <div className="inv-biz-sub">Purchase Record / खरिद रेकर्ड</div>
           </div>
           <div className="inv-title-block">
             <div className="inv-title">PURCHASE BILL</div>
@@ -61,22 +61,22 @@ function BillPrint({ bill, bizName, profile, onClose }) {
 
         <div className="inv-meta">
           <div className="inv-meta-left">
-            <div><b>Vendor:</b></div>
+            <div><b>Vendor / आपूर्तिकर्ता:</b></div>
             <div>{bill.vendor_name}</div>
             {bill.vendor_address && <div>{bill.vendor_address}</div>}
             {bill.vendor_pan && <div>PAN: {bill.vendor_pan}</div>}
           </div>
           <div className="inv-meta-right">
-            <div><span>Bill No:</span><b>{bill.fiscal_year}-PB-{String(bill.bill_number).padStart(4,"0")}</b></div>
-            <div><span>Date:</span><b>{bill.bill_date}</b></div>
-            {bill.due_date && <div><span>Due:</span><b>{bill.due_date}</b></div>}
-            {bill.vendor_bill_ref && <div><span>Vendor Ref:</span><b>{bill.vendor_bill_ref}</b></div>}
+            <div><span>Bill No / बिल नं:</span><b>{bill.fiscal_year}-PB-{String(bill.bill_number).padStart(4,"0")}</b></div>
+            <div><span>Date / मिति:</span><b>{bill.bill_date}</b></div>
+            {bill.due_date && <div><span>Due / भुक्तानी मिति:</span><b>{bill.due_date}</b></div>}
+            {bill.vendor_bill_ref && <div><span>Vendor Ref / आपूर्तिकर्ता सन्दर्भ:</span><b>{bill.vendor_bill_ref}</b></div>}
           </div>
         </div>
 
         <table className="inv-table">
           <thead>
-            <tr><th>#</th><th>Description</th><th>Unit</th><th className="r">Qty</th><th className="r">Rate</th><th className="r">Amount</th><th className="r">VAT%</th><th className="r">VAT</th><th className="r">Total</th></tr>
+            <tr><th>#</th><th>Description / विवरण</th><th>Unit / इकाई</th><th className="r">Qty / परिमाण</th><th className="r">Rate / दर</th><th className="r">Amount / रकम</th><th className="r">VAT% / भ्याट%</th><th className="r">VAT / भ्याट</th><th className="r">Total / जम्मा</th></tr>
           </thead>
           <tbody>
             {bill.purchase_bill_lines.map((l,i) => (
@@ -92,16 +92,16 @@ function BillPrint({ bill, bizName, profile, onClose }) {
             ))}
           </tbody>
           <tfoot>
-            <tr><td colSpan={5}></td><td className="r"><b>Subtotal</b></td><td colSpan={2}></td><td className="r"><b>{Number(bill.subtotal).toLocaleString()}</b></td></tr>
-            <tr><td colSpan={5}></td><td className="r"><b>Input VAT</b></td><td colSpan={2}></td><td className="r"><b>{Number(bill.vat_amount).toLocaleString()}</b></td></tr>
-            <tr className="inv-total-row"><td colSpan={5}></td><td className="r"><b>TOTAL</b></td><td colSpan={2}></td><td className="r"><b>{Number(bill.total).toLocaleString()}</b></td></tr>
+            <tr><td colSpan={5}></td><td className="r"><b>Subtotal / उप-जम्मा</b></td><td colSpan={2}></td><td className="r"><b>{Number(bill.subtotal).toLocaleString()}</b></td></tr>
+            <tr><td colSpan={5}></td><td className="r"><b>Input VAT / इनपुट भ्याट</b></td><td colSpan={2}></td><td className="r"><b>{Number(bill.vat_amount).toLocaleString()}</b></td></tr>
+            <tr className="inv-total-row"><td colSpan={5}></td><td className="r"><b>TOTAL / कुल जम्मा</b></td><td colSpan={2}></td><td className="r"><b>{Number(bill.total).toLocaleString()}</b></td></tr>
           </tfoot>
         </table>
 
-        {bill.notes && <div className="inv-notes"><b>Notes:</b> {bill.notes}</div>}
+        {bill.notes && <div className="inv-notes"><b>Notes / कैफियत:</b> {bill.notes}</div>}
         <div className="inv-footer">
-          <div className="inv-sign"><div className="inv-sign-line"></div><div>Received by</div></div>
-          <div className="inv-footer-note">Input VAT claimable against output VAT</div>
+          <div className="inv-sign"><div className="inv-sign-line"></div><div>Received by / प्राप्त गर्ने</div></div>
+          <div className="inv-footer-note">Input VAT claimable against output VAT / इनपुट भ्याट आउटपुट भ्याटविरुद्ध दाबी गर्न मिल्ने</div>
         </div>
       </div>
     </div>
