@@ -269,6 +269,8 @@ export default function Purchases() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
+  const lifecycleOf = (bill) => bill.document_status || (["cancelled", "credited", "draft"].includes(bill.status) ? bill.status : "posted");
+
   // Arriving from a converted RFQ (?open=<bill-id>) opens that draft
   // for review straight away, instead of leaving the user to hunt
   // for it in the list.
@@ -308,7 +310,6 @@ export default function Purchases() {
     setBusy(false);
   };
 
-  const lifecycleOf = (bill) => bill.document_status || (["cancelled", "credited", "draft"].includes(bill.status) ? bill.status : "posted");
   const filtered = bills.filter((bill) => {
     if (filter === "all") return true;
     if (["draft", "posted", "cancelled", "credited"].includes(filter)) return lifecycleOf(bill) === filter;

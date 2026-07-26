@@ -34,7 +34,7 @@ function Step1({ value, onChange, onNext }) {
     <div className="wizard-body">
       <div className="wizard-welcome">
         <div className="wizard-logo"><span>हिसाब</span>HisabKitab</div>
-        <h2>Welcome! Let's set up your books.</h2>
+        <h2>Welcome! Let&apos;s set up your books.</h2>
         <p className="muted">It takes about 2 minutes. What type of business is this?</p>
       </div>
       <div className="wizard-type-grid">

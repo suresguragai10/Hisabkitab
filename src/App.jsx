@@ -69,6 +69,14 @@ export default function App() {
   };
 
 
+  // A user "needs password" if they logged in via OTP and have never set one.
+  // Supabase stores this as user_metadata.has_password.
+  const checkNeedsPassword = (s) => {
+    const meta = s?.user?.user_metadata || {};
+    setNeedsPassword(!meta.has_password);
+    setLoading(false);
+  };
+
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
       const s = data.session;
@@ -83,14 +91,6 @@ export default function App() {
     });
     return () => sub.subscription.unsubscribe();
   }, []);
-
-  // A user "needs password" if they logged in via OTP and have never set one.
-  // Supabase stores this as user_metadata.has_password.
-  const checkNeedsPassword = (s) => {
-    const meta = s?.user?.user_metadata || {};
-    setNeedsPassword(!meta.has_password);
-    setLoading(false);
-  };
 
   const onPasswordSet = async () => {
     // Refresh session metadata so the flag is updated
@@ -593,7 +593,7 @@ function Authed({ session, lang, toggleLang }) {
       )}
       <main className="app-main app-main-sidebar">
         {seeding && <p className="note">{t("loading", lang)}</p>}
-        {seedErr && <p className="msg err">Couldn't set up default accounts: {seedErr}</p>}
+        {seedErr && <p className="msg err">Could not set up default accounts: {seedErr}</p>}
         {!seeding && (
           <TabErrorBoundary key={tab}>
             <Routes>

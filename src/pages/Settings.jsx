@@ -180,7 +180,7 @@ export default function Settings() {
 
           {loadingP ? <p className="note">Loading…</p> :
            periods.length === 0 ? (
-            <p className="note">No periods set up for {fiscalYear} yet. Click "Generate 12 Monthly Periods" above to create them.</p>
+            <p className="note">No periods set up for {fiscalYear} yet. Click &ldquo;Generate 12 Monthly Periods&rdquo; above to create them.</p>
           ) : (
             <>
               <div style={{marginBottom:8,fontSize:13,color:"var(--ink2)"}}>

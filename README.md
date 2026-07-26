@@ -1,54 +1,34 @@
 # HisabKitab
 
-HisabKitab is a React, Vite, Supabase, and PostgreSQL accounting prototype for Nepal-focused businesses.
+HisabKitab is a React, Vite, Supabase (PostgreSQL) accounting application for Nepal-focused businesses.
 
-## Current release
+## What it does today
 
-Version **6.5.0** includes remediation Stages 1–6:
+- Invoicing, purchase bills, credit/debit notes — draft → post → cancel lifecycle, with payment allocations and partial-payment status.
+- Sales Orders and RFQ/Purchase Quotations — pre-invoice/pre-bill commitments (draft → confirmed/sent → converted or cancelled) that convert into an invoice/bill draft; Sales Orders reserve stock (`committed_stock`) until converted or cancelled.
+- Perpetual weighted-average inventory and COGS, posted automatically on invoice/bill posting.
+- Manual vouchers (journal/payment/receipt/contra), structured Chart of Accounts, balanced opening journals, fiscal-period locking.
+- VAT preparation (Annex 13 export) and TDS (deduction, remittance, certificates).
+- Multi-user workspaces with real role-based access control (owner / accountant / staff / viewer), enforced in the database via `assert_role()`, not just hidden in the UI.
+- Bank reconciliation, structured financial reports (Trial Balance, P&L, Balance Sheet, Cash Flow, Ageing, Sales/Purchase Register, Stock Valuation) with drill-down and CSV export.
+- Bilingual (English/Nepali) print documents for Invoices, Bills, and Credit/Debit Notes. The rest of the app UI is still English-only.
+- Dashboard with cash position, sales trend, overdue/due-soon receivables and payables, TDS/bank-reconciliation alerts, gross margin, and top-overdue-customers.
 
-- safe manual double-entry vouchers;
-- payment allocations and partial-payment status;
-- perpetual moving-weighted-average inventory and COGS;
-- controlled document lifecycle, reversals, credit notes, and debit notes;
-- structured Chart of Accounts and balanced opening journals;
-- database-generated, ledger-reconciled financial and operational reports.
-
-The application remains a controlled development prototype and is not approved for production bookkeeping or statutory reliance. Complete the remaining tax, fiscal-period, security, testing, backup, and professional-review gates in `IMPLEMENTATION_PLAN.md`.
-
-## Stage 6 reports
-
-- General Ledger
-- Day Book
-- Trial Balance
-- Profit & Loss
-- Balance Sheet
-- Cash Flow
-- Receivables Ageing
-- Payables Ageing
-- Sales Register
-- Purchase Register
-- VAT Report
-- Stock Valuation
-
-Reports support date/as-of selection, fiscal-year filtering where applicable, print, CSV export, and account drill-down. Reconciliation differences are shown rather than hidden.
-
-## Database migration
-
-Use a staging Supabase project and take a backup first. Apply the migration chain in order. For Stage 6:
-
-```text
-sql/phaseP0_6_trustworthy_reports_preflight.sql
-sql/phaseP0_6_trustworthy_reports.sql
-sql/phaseP0_6_trustworthy_reports_verify.sql
-```
-
-The repository also contains the corrected Stage 5 migration, including the null-safe control-account flag and credit/debit-note voucher types.
+The application is a working prototype under active development, not yet certified for production bookkeeping or statutory reliance without independent review. See `docs/AUDIT_TRACKER.md` for the current, maintained status of every known gap (security, UI/UX, testing) — it's the live source of truth, not this file.
 
 ## Local development
 
 ```bash
 npm install
 npm run dev
+```
+
+## Testing and linting
+
+```bash
+npm test          # vitest
+npm run lint       # eslint
+npm run format     # prettier --write
 ```
 
 ## Production build
@@ -59,12 +39,16 @@ npm run build
 
 Deploy the complete generated `dist` directory as one release. Do not mix `index.html` or asset files from different builds.
 
+## Database migrations
+
+All schema/function changes live in `sql/`, named `phase<N>_<description>.sql` in the order they should be applied. Apply new migrations against a staging Supabase project first when possible. Live-database state can drift from what's in this repo (several tables/views were built directly in Supabase Studio before being captured back into git) — when in doubt, check the live definition (`pg_proc`, `pg_views`, `information_schema`) rather than assuming the repo file is current.
+
 ## Configuration and secrets
 
 Supabase browser configuration is in `src/config.js`. The frontend must use only a browser-safe publishable/anon key. Never place a service-role key, database password, SMTP password, or deployment token in frontend source or Git.
 
 ## Documentation
 
-- `IMPLEMENTATION_PLAN.md` — ordered remediation roadmap
-- `PRODUCT_AUDIT.md` — accounting, product, security, and UI audit
-- `STAGE6_IMPLEMENTATION_NOTES.md` — Stage 6 migration and acceptance procedure
+- `docs/AUDIT_TRACKER.md` — the maintained, cross-session tracker of every audit finding and its current status. Start here.
+- `PRODUCT_AUDIT.md` — the original independent product/accounting/security/UI audit report.
+- `IMPLEMENTATION_PLAN.md`, `STAGE2_IMPLEMENTATION_NOTES.md` through `STAGE6_IMPLEMENTATION_NOTES.md` — historical implementation notes from earlier development stages.

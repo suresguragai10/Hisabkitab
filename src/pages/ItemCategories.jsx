@@ -78,8 +78,8 @@ export default function ItemCategories({ onChanged }) {
         <div>
           <h2>Item Categories</h2>
           <div className="muted" style={{ fontSize: 13 }}>
-            Group items so you can run "sales by category" and keep item lists tidy.
-            Optional parent lets you nest ("Beverages → Energy Drinks").
+            Group items so you can run &ldquo;sales by category&rdquo; and keep item lists tidy.
+            Optional parent lets you nest (&ldquo;Beverages → Energy Drinks&rdquo;).
           </div>
         </div>
       </div>
