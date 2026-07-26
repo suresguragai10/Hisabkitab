@@ -21,7 +21,7 @@ const blankLine = () => ({ itemId: "", description: "", quantity: "1", unit: "pc
 async function listInvoices() {
   const { data, error } = await supabase
     .from("invoices")
-    .select("*, invoice_lines(*), sales_orders(order_number, fiscal_year)")
+    .select("*, invoice_lines(*), sales_orders!sales_order_id(order_number, fiscal_year)")
     .order("invoice_date", { ascending: false });
   if (error) throw error;
   return data;

@@ -31,7 +31,7 @@ async function fetchItems() {
 async function listBills() {
   const { data, error } = await supabase
     .from("purchase_bills")
-    .select("*, purchase_bill_lines(*), purchase_quotations(rfq_number, fiscal_year)")
+    .select("*, purchase_bill_lines(*), purchase_quotations!rfq_id(rfq_number, fiscal_year)")
     .order("bill_date", { ascending: false });
   if (error) throw error;
   return data;
