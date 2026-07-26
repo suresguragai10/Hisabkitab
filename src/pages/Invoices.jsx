@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { supabase } from "../supabase";
 import { listParties } from "../lib/db";
 import { currentFiscalYear } from "../lib/fiscalYear";
@@ -259,6 +260,7 @@ function BizProfilePanel({ profile, onSave, onClose }) {
 
 // ── Main Invoices page ────────────────────────────────────────
 export default function Invoices() {
+  const [searchParams, setSearchParams] = useSearchParams();
   const { profile, loading: profLoading, save: saveProfile } = useBusinessProfile();
   const [invoices, setInvoices] = useState([]);
   const [parties, setParties] = useState([]);
@@ -419,6 +421,17 @@ export default function Invoices() {
     setErr(null);
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
+
+  // Arriving from a converted Sales Order (?open=<invoice-id>) opens
+  // that draft for review straight away, instead of leaving the user
+  // to hunt for it in the list.
+  useEffect(() => {
+    const openId = searchParams.get("open");
+    if (!openId || invoices.length === 0) return;
+    const target = invoices.find((invoice) => invoice.id === openId);
+    if (target && target.document_status === "draft") editDraft(target);
+    setSearchParams({}, { replace: true });
+  }, [invoices]); // eslint-disable-line
 
   const postDraft = async (invoice) => {
     setBusy(true);

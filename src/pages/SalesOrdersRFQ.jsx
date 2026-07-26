@@ -6,6 +6,7 @@
 // still gets its own route/nav entry -- pass docType="so"|"rfq".
 // ============================================================
 import React, { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { supabase } from "../supabase";
 import { listParties } from "../lib/db";
 import { currentFiscalYear } from "../lib/fiscalYear";
@@ -294,9 +295,11 @@ export default function SalesOrdersRFQ({ docType, lang = "en" }) {
                       <button className="link" onClick={() => doConvert(doc)}>{convertLabel}</button>{" · "}
                       <button className="link" style={{ color: "var(--rust)" }} onClick={() => setCancelDoc(doc)}>Cancel</button>
                     </>}
-                    {doc.status === "converted" && <span className="muted">
-                      Converted{isSO ? "" : ""} → {isSO ? "Invoice" : "Bill"} created
-                    </span>}
+                    {doc.status === "converted" && (
+                      <Link className="link" to={`/${isSO ? "invoices" : "purchases"}?open=${isSO ? doc.invoice_id : doc.bill_id}`}>
+                        View {isSO ? "Invoice" : "Bill"} →
+                      </Link>
+                    )}
                     {doc.status === "cancelled" && <span className="muted" title={doc.cancellation_reason}>Cancelled</span>}
                   </td>
                 </tr>

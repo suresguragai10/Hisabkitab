@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { supabase } from "../supabase";
 import { listParties } from "../lib/db";
 import { currentFiscalYear } from "../lib/fiscalYear";
@@ -109,6 +110,7 @@ function BillPrint({ bill, bizName, profile, onClose }) {
 
 // ── Main Purchases page ───────────────────────────────────────
 export default function Purchases() {
+  const [searchParams, setSearchParams] = useSearchParams();
   const [bills, setBills] = useState([]);
   const [parties, setParties] = useState([]);
   const [items, setItems] = useState([]);
@@ -266,6 +268,17 @@ export default function Purchases() {
     setErr(null);
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
+
+  // Arriving from a converted RFQ (?open=<bill-id>) opens that draft
+  // for review straight away, instead of leaving the user to hunt
+  // for it in the list.
+  useEffect(() => {
+    const openId = searchParams.get("open");
+    if (!openId || bills.length === 0) return;
+    const target = bills.find((bill) => bill.id === openId);
+    if (target && lifecycleOf(target) === "draft") editDraft(target);
+    setSearchParams({}, { replace: true });
+  }, [bills]); // eslint-disable-line
 
   const postDraft = async (bill) => {
     setBusy(true);
