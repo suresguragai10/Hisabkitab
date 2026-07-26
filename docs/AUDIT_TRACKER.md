@@ -45,7 +45,7 @@ Section numbers below match `PRODUCT_AUDIT.md` headings so the two files can be 
 | 4.3 | Every page is one large panel, weak hierarchy | ❌ Open | Not attempted. |
 | 4.4 | Tables not mobile-safe | ❌ Open | Not attempted. |
 | 4.5 | Accessibility near-absent (no `aria-*`, `<div>` click targets) | ❌ Open | Not attempted. |
-| 4.6 | No routing — Back/refresh/bookmarks broken | ❌ Open | Confirmed: no `react-router` (or any router) in `package.json`. Still local-state-only navigation. |
+| 4.6 | No routing — Back/refresh/bookmarks broken | ✅ | Fixed 2026-07-26: `react-router-dom` (`HashRouter`, since this is a static GitHub Pages deploy with no server-side rewrite support) now drives navigation. Every page is a real `<Route>`, the sidebar uses `NavLink`, and the URL is the source of truth for the current page — real Back/Forward, refresh-safe pages, bookmarkable/shareable links. Done as the first step of a deliberate structural sequence (routing → nav restructure → shared UI primitives → new features) so later work doesn't get built on the old tab-state system and need rewiring. |
 | 4.7 | Inconsistent `alert`/`prompt`/`confirm` usage | ✅ | All 11 remaining calls replaced with a shared `ConfirmDialog`/`Toast` system (`src/lib/dialogs.js` + `src/components/DialogHost.jsx`, mounted once in `App.jsx`), styled to match the existing modal design. Verified: `grep` for `alert(`/`confirm(`/`prompt(` across `src/pages`+`src/components` now returns nothing; build (116 modules) and test suite (13/13) both pass. |
 | 4.8 | Bilingual support incomplete | ❌ Open | Not attempted this project. |
 | 4.9 | Dashboard needs more decision-value cards | ❌ Open | Not attempted. |
