@@ -34,7 +34,7 @@ Section numbers below match `PRODUCT_AUDIT.md` headings so the two files can be 
 
 | Finding | Status | Notes |
 |---|---|---|
-| Sidebar exposes too many low-level masters; recommended restructure (Home/Sales/Purchases/Banking/Accounting/Inventory/Reports/Tax/Settings) | ❌ Open | Not attempted this project. Current nav still flat per `App.jsx`. Real UX work, not a bug — do as a deliberate redesign task when picked up, not a quick patch. |
+| Sidebar exposes too many low-level masters; recommended restructure (Home/Sales/Purchases/Banking/Accounting/Inventory/Reports/Tax/Settings) | ✅ | Done 2026-07-26 as structural step 2 (right after routing landed): Banking split out from Accounting (Bank Reconciliation), Tax & Compliance split out from Reports (VAT/TDS), Audit Log moved under Settings. Contacts deliberately kept unified rather than split into Customers/Suppliers — one page already correctly handles customer/vendor/both, splitting the nav wouldn't split the underlying data model. Credit/Debit Notes gets two findable nav entries (Sales → Credit Notes, Purchases → Debit Notes) routing to the same shared page instead of duplicating it. |
 
 ## 4. UI and UX audit
 
