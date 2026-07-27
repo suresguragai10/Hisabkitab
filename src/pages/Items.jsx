@@ -361,6 +361,7 @@ export default function Items({ onChanged }) {
           No items match. <a className="link" onClick={() => { setEditing(null); setShowForm(true); }}>Add your first item.</a>
         </p>
       ) : (
+        <div className="table-scroll">
         <table className="tbl">
           <thead>
             <tr>
@@ -428,6 +429,7 @@ export default function Items({ onChanged }) {
             ))}
           </tbody>
         </table>
+        </div>
       )}
 
       {showForm && (

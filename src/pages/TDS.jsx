@@ -64,6 +64,7 @@ function TDSCertificate({ entries, payeeName, onClose, tdsTypes, bizProfile }) {
           </div>
         </div>
 
+        <div className="table-scroll">
         <table className="inv-table" style={{marginTop:16}}>
           <thead>
             <tr>
@@ -97,6 +98,7 @@ function TDSCertificate({ entries, payeeName, onClose, tdsTypes, bizProfile }) {
             </tr>
           </tfoot>
         </table>
+        </div>
 
         <div style={{marginTop:24,padding:"12px 16px",background:"#f8f8f6",borderRadius:8,fontSize:12}}>
           <b>Certified that the above TDS has been deducted as per prevailing law and will be/has been remitted to Inland Revenue Department (IRD), Nepal.</b>
@@ -361,6 +363,7 @@ export default function TDS({ userId }) {
         view === "remittances" ? (
           /* Remittance history */
           remittances.length === 0 ? <p className="note">No remittances yet.</p> : (
+            <div className="table-scroll">
             <table className="tbl" style={{marginTop:8}}>
               <thead><tr><th>Date</th><th>Period</th><th className="num">Total TDS</th><th>Challan No</th><th>Mode</th></tr></thead>
               <tbody>
@@ -375,6 +378,7 @@ export default function TDS({ userId }) {
                 ))}
               </tbody>
             </table>
+            </div>
           )
         ) : (
 
@@ -382,6 +386,7 @@ export default function TDS({ userId }) {
           allByView.length === 0 ? (
             <p className="note">{view==="pending" ? "No pending TDS — all remitted ✓" : "No TDS entries yet."}</p>
           ) : (
+            <div className="table-scroll">
             <table className="tbl" style={{marginTop:8}}>
               <thead>
                 <tr>
@@ -430,6 +435,7 @@ export default function TDS({ userId }) {
                 </tr>
               </tfoot>
             </table>
+            </div>
           )
         )
       )}

@@ -325,6 +325,7 @@ export default function BankReconciliation() {
       {!activeStmt && (
         loading ? <p className="note">Loading…</p> :
         statements.length === 0 ? <p className="note">No reconciliations yet. Create one above to start.</p> : (
+          <div className="table-scroll">
           <table className="tbl" style={{marginTop:8}}>
             <thead><tr><th>Account</th><th>Period</th><th>Opening</th><th>Closing</th><th>Status</th><th/></tr></thead>
             <tbody>
@@ -340,6 +341,7 @@ export default function BankReconciliation() {
               ))}
             </tbody>
           </table>
+          </div>
         )
       )}
 

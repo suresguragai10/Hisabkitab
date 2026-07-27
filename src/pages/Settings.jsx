@@ -186,6 +186,7 @@ export default function Settings() {
               <div style={{marginBottom:8,fontSize:13,color:"var(--ink2)"}}>
                 {lockedCount} locked · {unlockedCount} open
               </div>
+              <div className="table-scroll">
               <table className="tbl">
                 <thead>
                   <tr><th>Period</th><th>From</th><th>To</th><th>Status</th><th>Locked At</th>{canEdit&&<th/>}</tr>
@@ -215,6 +216,7 @@ export default function Settings() {
                   ))}
                 </tbody>
               </table>
+              </div>
             </>
           )}
         </>
@@ -233,6 +235,7 @@ export default function Settings() {
           {loadingT ? <p className="note">Loading…</p> : (
             <>
               <div className="dash-section-title" style={{marginTop:16}}>VAT Rates</div>
+              <div className="table-scroll">
               <table className="tbl" style={{marginBottom:20}}>
                 <thead><tr><th>Transaction Type</th><th>Label</th><th className="num">Rate %</th></tr></thead>
                 <tbody>
@@ -245,8 +248,10 @@ export default function Settings() {
                   ))}
                 </tbody>
               </table>
+              </div>
 
               <div className="dash-section-title">TDS Rates</div>
+              <div className="table-scroll">
               <table className="tbl">
                 <thead><tr><th>Transaction Type</th><th>Label</th><th className="num">Rate %</th><th>IRD Reference</th></tr></thead>
                 <tbody>
@@ -260,6 +265,7 @@ export default function Settings() {
                   ))}
                 </tbody>
               </table>
+              </div>
 
               <p className="note" style={{marginTop:12}}>
                 To change a rate (e.g. if IRD updates TDS on rent), contact your accountant

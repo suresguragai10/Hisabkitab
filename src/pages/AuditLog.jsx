@@ -33,6 +33,7 @@ export default function AuditLog() {
         logs.length === 0 ? (
           <p className="note">No audit entries yet. Actions like voiding vouchers and deactivating accounts will appear here.</p>
         ) : (
+          <div className="table-scroll">
           <table className="tbl">
             <thead>
               <tr>
@@ -68,6 +69,7 @@ export default function AuditLog() {
               ))}
             </tbody>
           </table>
+          </div>
         )
       )}
     </div>

@@ -161,6 +161,7 @@ export default function PaymentModal({ docType, doc, onClose, onSaved }) {
           ) : history.length === 0 ? (
             <p className="note">No payments recorded for this document.</p>
           ) : (
+            <div className="table-scroll">
             <table className="tbl">
               <thead><tr><th>Date</th><th>Amount</th><th>Mode</th><th>Status</th><th /></tr></thead>
               <tbody>
@@ -216,6 +217,7 @@ export default function PaymentModal({ docType, doc, onClose, onSaved }) {
                 })}
               </tbody>
             </table>
+            </div>
           )}
         </div>
       </div>

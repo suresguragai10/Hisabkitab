@@ -129,6 +129,7 @@ export default function TeamMembers() {
       {loading ? <p className="note">Loading…</p> : members.length === 0 ? (
         <p className="note">No team members yet. Invite your accountant or staff above.</p>
       ) : (
+        <div className="table-scroll">
         <table className="tbl">
           <thead>
             <tr>
@@ -162,11 +163,13 @@ export default function TeamMembers() {
             ))}
           </tbody>
         </table>
+        </div>
       )}
 
       {/* Permissions table */}
       <div style={{marginTop:24}}>
         <div className="dash-section-title">Permission Summary</div>
+        <div className="table-scroll">
         <table className="tbl">
           <thead>
             <tr><th>Feature</th><th>Owner</th><th>Accountant</th><th>Staff</th><th>Viewer</th></tr>
@@ -195,6 +198,7 @@ export default function TeamMembers() {
             ))}
           </tbody>
         </table>
+        </div>
       </div>
     </div>
   );

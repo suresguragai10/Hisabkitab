@@ -336,6 +336,7 @@ export default function Contacts({ userId, onChanged, onViewStatement }) {
           <a className="link" onClick={() => { setEditing(null); setShowForm(true); }}>add your first contact</a>.
         </p>
       ) : (
+        <div className="table-scroll">
         <table className="tbl">
           <thead>
             <tr>
@@ -397,6 +398,7 @@ export default function Contacts({ userId, onChanged, onViewStatement }) {
             ))}
           </tbody>
         </table>
+        </div>
       )}
 
       {showForm && (

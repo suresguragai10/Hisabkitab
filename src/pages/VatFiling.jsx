@@ -155,6 +155,7 @@ export default function VatFiling() {
       {loading ? <p className="note">Loading…</p> : periods.length === 0 ? (
         <p className="note">No fiscal periods set up for {fiscalYear} yet. Create them from Settings first.</p>
       ) : (
+        <div className="table-scroll">
         <table className="tbl" style={{ marginTop: 8 }}>
           <thead>
             <tr><th>Period</th><th>From</th><th>To</th><th>VAT Status</th><th className="num">Net Payable</th><th/></tr>
@@ -200,6 +201,7 @@ export default function VatFiling() {
             })}
           </tbody>
         </table>
+        </div>
       )}
     </div>
   );
@@ -223,6 +225,7 @@ function VatReturnDetail({ vatReturn }) {
       </div>
 
       {rows.length > 0 && (
+        <div className="table-scroll">
         <table className="tbl" style={{ marginTop: 12 }}>
           <thead>
             <tr><th>Date</th><th>Document</th><th>Party</th><th className="num">Taxable</th><th className="num">Output VAT</th><th className="num">Input VAT</th></tr>
@@ -240,6 +243,7 @@ function VatReturnDetail({ vatReturn }) {
             ))}
           </tbody>
         </table>
+        </div>
       )}
 
       {vatReturn.status === "filed" && (

@@ -130,6 +130,7 @@ export default function ItemCategories({ onChanged }) {
       {loading ? <p className="note">Loading…</p> : rows.length === 0 ? (
         <p className="note">No categories yet. Add your first one above.</p>
       ) : (
+        <div className="table-scroll">
         <table className="tbl">
           <thead>
             <tr>
@@ -162,6 +163,7 @@ export default function ItemCategories({ onChanged }) {
             ))}
           </tbody>
         </table>
+        </div>
       )}
     </div>
   );

@@ -226,6 +226,7 @@ export default function Dashboard({ refreshKey, onNav }) {
             {stats.top_overdue_customers?.length > 0 && (
               <div>
                 <div className="dash-section-title">Top Overdue Customers</div>
+                <div className="table-scroll">
                 <table className="tbl">
                   <thead><tr><th>Customer</th><th className="num">Overdue</th></tr></thead>
                   <tbody>
@@ -237,6 +238,7 @@ export default function Dashboard({ refreshKey, onNav }) {
                     ))}
                   </tbody>
                 </table>
+                </div>
               </div>
             )}
 
@@ -246,6 +248,7 @@ export default function Dashboard({ refreshKey, onNav }) {
               {!activity?.invoices?.length ? (
                 <p className="note">No invoices yet.</p>
               ) : (
+                <div className="table-scroll">
                 <table className="tbl">
                   <thead><tr><th>Invoice #</th><th>Customer</th><th className="num">Amount</th><th>Status</th></tr></thead>
                   <tbody>
@@ -259,6 +262,7 @@ export default function Dashboard({ refreshKey, onNav }) {
                     ))}
                   </tbody>
                 </table>
+                </div>
               )}
             </div>
 
@@ -268,6 +272,7 @@ export default function Dashboard({ refreshKey, onNav }) {
               {!activity?.vouchers?.length ? (
                 <p className="note">No vouchers yet.</p>
               ) : (
+                <div className="table-scroll">
                 <table className="tbl">
                   <thead><tr><th>Date</th><th>Type</th><th>Narration</th></tr></thead>
                   <tbody>
@@ -280,6 +285,7 @@ export default function Dashboard({ refreshKey, onNav }) {
                     ))}
                   </tbody>
                 </table>
+                </div>
               )}
             </div>
           </div>

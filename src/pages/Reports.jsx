@@ -211,6 +211,7 @@ function DayBook({ data }) {
         <span><b>{voucher.date}</b> · {titleCase(voucher.voucher_type)} #{voucher.voucher_number} · {voucher.narration || "—"}</span>
         <span>NPR {money(voucher.debit)}</span>
       </summary>
+      <div className="table-scroll">
       <table className="tbl" style={{ marginTop: 10 }}>
         <thead><tr><th>Account</th><th>Description</th><th className="num">Debit</th><th className="num">Credit</th></tr></thead>
         <tbody>{(voucher.lines || []).map((line) => <tr key={line.line_id}>
@@ -218,6 +219,7 @@ function DayBook({ data }) {
           <td className="num">{Number(line.debit) ? money(line.debit) : ""}</td><td className="num">{Number(line.credit) ? money(line.credit) : ""}</td>
         </tr>)}</tbody>
       </table>
+      </div>
     </details>)}
     <p className="note">Total debit: <b>NPR {money(data.total_debit)}</b> · Total credit: <b>NPR {money(data.total_credit)}</b></p>
   </div>;
@@ -227,6 +229,7 @@ function TrialBalance({ data, onDrill }) {
   return <div className="report-wrap">
     <div className="report-title">Trial Balance</div><div className="report-period">As of {data.as_of}</div>
     <StatusBanner good={data.balanced} goodText="Books balance — debits equal credits" badText="Trial Balance is out of balance" difference={data.difference} />
+    <div className="table-scroll">
     <table className="tbl"><thead><tr><th>Account</th><th>Report class</th><th className="num">Debit</th><th className="num">Credit</th></tr></thead>
       <tbody>{(data.rows || []).map((row) => <tr key={row.account_id}>
         <td><AccountButton row={row} onDrill={onDrill} /></td><td>{titleCase(row.report_class)}</td>
@@ -234,6 +237,7 @@ function TrialBalance({ data, onDrill }) {
       </tr>)}</tbody>
       <tfoot><tr><td colSpan={2}><b>Total</b></td><td className="num"><b>{money(data.total_debit)}</b></td><td className="num"><b>{money(data.total_credit)}</b></td></tr></tfoot>
     </table>
+    </div>
   </div>;
 }
 
@@ -288,9 +292,11 @@ function CashFlow({ data }) {
       <tr><td><b>Closing cash and bank</b></td><td className="num"><b>{signedMoney(data.closing_cash)}</b></td></tr>
     </tbody></table>
     <div className="report-section-title" style={{ marginTop: 20 }}>Cash movements</div>
+    <div className="table-scroll">
     <table className="tbl"><thead><tr><th>Date</th><th>Voucher</th><th>Narration</th><th>Category</th><th className="num">Amount</th></tr></thead>
       <tbody>{rows.map((row, index) => <tr key={`${row.voucher_id}-${row.cash_flow_category}-${index}`}><td>{row.date}</td><td>{titleCase(row.voucher_type)} #{row.voucher_number}</td><td>{row.narration || "—"}</td><td>{titleCase(row.cash_flow_category)}</td><td className="num">{signedMoney(row.amount)}</td></tr>)}</tbody>
     </table>
+    </div>
   </div>;
 }
 
@@ -301,20 +307,24 @@ function Ageing({ data, kind }) {
     <div className="stat-row" style={{ marginBottom: 16 }}>
       {[['Current',data.current],['1–30 days',data.days_1_30],['31–60 days',data.days_31_60],['61–90 days',data.days_61_90],['Over 90 days',data.over_90]].map(([label, value]) => <div className="stat" key={label}><small>{label}</small><span>{money(value)}</span></div>)}
     </div>
+    <div className="table-scroll">
     <table className="tbl"><thead><tr><th>Document</th><th>{isReceivable ? "Customer" : "Supplier"}</th><th>Date</th><th>Due</th><th className="num">Net</th><th className="num">Paid</th><th className="num">Outstanding</th><th>Bucket</th></tr></thead>
       <tbody>{(data.rows || []).map((row) => <tr key={row.document_id}><td>#{isReceivable ? row.invoice_number : row.bill_number}</td><td>{isReceivable ? row.party_name : row.vendor_name}</td><td>{isReceivable ? row.invoice_date : row.bill_date}</td><td>{row.due_date || "—"}</td><td className="num">{money(row.net_amount)}</td><td className="num">{money(row.paid_amount)}</td><td className="num"><b>{money(row.outstanding)}</b></td><td>{titleCase(row.bucket)}</td></tr>)}</tbody>
       <tfoot><tr><td colSpan={6}><b>Total</b></td><td className="num"><b>{money(data.total)}</b></td><td /></tr></tfoot>
     </table>
+    </div>
     <p className="note">Ledger balance: <b>NPR {money(data.ledger_balance)}</b></p>
   </div>;
 }
 
 function Register({ data, kind }) {
   return <div className="report-wrap"><div className="report-title">{kind === "sales" ? "Sales" : "Purchase"} Register</div><div className="report-period">{data.from} to {data.to}</div>
+    <div className="table-scroll">
     <table className="tbl"><thead><tr><th>Date</th><th>Type / #</th><th>Party</th><th>PAN/VAT</th><th className="num">Taxable</th><th className="num">VAT</th><th className="num">Total</th></tr></thead>
       <tbody>{(data.rows || []).map((row) => <tr key={`${row.document_type}-${row.document_id}`}><td>{row.document_date}</td><td>{titleCase(row.document_type)} #{row.document_number}</td><td>{row.party_name}</td><td>{row.pan_vat || "—"}</td><td className="num">{signedMoney(row.subtotal)}</td><td className="num">{signedMoney(row.vat_amount)}</td><td className="num"><b>{signedMoney(row.total)}</b></td></tr>)}</tbody>
       <tfoot><tr><td colSpan={4}><b>Net total</b></td><td className="num"><b>{signedMoney(data.subtotal)}</b></td><td className="num"><b>{signedMoney(data.vat)}</b></td><td className="num"><b>{signedMoney(data.total)}</b></td></tr></tfoot>
     </table>
+    </div>
   </div>;
 }
 
@@ -326,19 +336,23 @@ function VatReport({ data }) {
       <tr><td>Input VAT</td><td className="num">{money(data.input_vat)}</td><td className="muted">Ledger {money(data.input_vat_ledger)}</td></tr>
       <tr><td><b>Net VAT payable</b></td><td className="num"><b>{signedMoney(data.net_vat_payable)}</b></td><td /></tr>
     </tbody></table>
+    <div className="table-scroll">
     <table className="tbl" style={{ marginTop: 18 }}><thead><tr><th>Date</th><th>Source</th><th>Party</th><th className="num">Output VAT</th><th className="num">Input VAT</th></tr></thead>
       <tbody>{(data.rows || []).map((row) => <tr key={`${row.source_type}-${row.source_id}`}><td>{row.document_date}</td><td>{titleCase(row.source_type)} #{row.document_number}</td><td>{row.party_name}</td><td className="num">{Number(row.output_vat) ? signedMoney(row.output_vat) : ""}</td><td className="num">{Number(row.input_vat) ? signedMoney(row.input_vat) : ""}</td></tr>)}</tbody>
     </table>
+    </div>
   </div>;
 }
 
 function StockValuation({ data }) {
   return <div className="report-wrap"><div className="report-title">Stock Valuation</div><div className="report-period">As of {data.as_of} · Moving weighted average</div>
     <StatusBanner good={data.reconciled} goodText="Stock valuation reconciles to Inventory Asset" badText="Stock valuation differs from Inventory Asset" difference={data.difference} />
+    <div className="table-scroll">
     <table className="tbl"><thead><tr><th>SKU</th><th>Item</th><th>Category</th><th className="num">Quantity</th><th>Unit</th><th className="num">Average cost</th><th className="num">Value</th></tr></thead>
       <tbody>{(data.rows || []).map((row) => <tr key={row.item_id}><td>{row.sku || "—"}</td><td>{row.name}</td><td>{row.category_name || "—"}</td><td className="num">{Number(row.quantity).toLocaleString()}</td><td>{row.unit}</td><td className="num">{money(row.average_cost)}</td><td className="num"><b>{money(row.inventory_value)}</b></td></tr>)}</tbody>
       <tfoot><tr><td colSpan={6}><b>Total stock valuation</b></td><td className="num"><b>{money(data.stock_valuation)}</b></td></tr></tfoot>
     </table>
+    </div>
     <p className="note">Inventory Asset ledger: <b>NPR {money(data.inventory_ledger_balance)}</b></p>
   </div>;
 }

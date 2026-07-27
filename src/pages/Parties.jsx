@@ -78,6 +78,7 @@ export default function Parties({ userId, onChanged }) {
       {err && <p className="msg err">{err}</p>}
       {loading ? <p className="note">Loading…</p> : (
         parties.length === 0 ? <p className="note">No parties yet. Add your first customer or vendor.</p> : (
+          <div className="table-scroll">
           <table className="tbl">
             <thead><tr><th>Name</th><th>Type</th><th>Phone</th><th>PAN/VAT</th><th className="num">Opening</th></tr></thead>
             <tbody>
@@ -94,6 +95,7 @@ export default function Parties({ userId, onChanged }) {
               ))}
             </tbody>
           </table>
+          </div>
         )
       )}
     </div>
