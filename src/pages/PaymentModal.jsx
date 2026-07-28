@@ -6,6 +6,7 @@ import {
 } from "../lib/posting";
 import { todayLocalDate } from "../lib/nepaliCalendar";
 import { formatMoney } from "../lib/format";
+import Modal from "../components/Modal";
 
 const fmt = formatMoney;
 
@@ -91,13 +92,11 @@ export default function PaymentModal({ docType, doc, onClose, onSaved }) {
   };
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-card" onClick={(e) => e.stopPropagation()}>
-        <div className="modal-head">
-          <h3>Record {actionLabel} — {docType === "invoice" ? "Invoice" : "Bill"} #{docNum}</h3>
-          <button className="link" aria-label="Close payment dialog" onClick={onClose}>✕</button>
-        </div>
-
+    <Modal
+      title={`Record ${actionLabel} — ${docType === "invoice" ? "Invoice" : "Bill"} #${docNum}`}
+      onClose={onClose}
+      closeOnBackdrop
+    >
         <div className="pay-summary">
           <div className="pay-summary-row"><span>{partyName}</span></div>
           <div className="pay-summary-row"><span>Total</span><span>NPR {fmt(total)}</span></div>
@@ -218,7 +217,6 @@ export default function PaymentModal({ docType, doc, onClose, onSaved }) {
             </div>
           )}
         </div>
-      </div>
-    </div>
+    </Modal>
   );
 }

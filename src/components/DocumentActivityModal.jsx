@@ -6,6 +6,7 @@ import {
   listDocumentActivity,
   registerAttachment,
 } from "../lib/lifecycle";
+import Modal from "./Modal";
 
 function formatBytes(value) {
   const bytes = Number(value || 0);
@@ -116,18 +117,12 @@ export default function DocumentActivityModal({ documentType, document, title, o
   };
 
   return (
-    <div className="modal-overlay" role="dialog" aria-modal="true" aria-label={title || "Document activity"}>
-      <div className="modal-card" style={{ maxWidth: 720 }}>
-        <div className="modal-head">
-          <div>
-            <h3>{title || "Document activity"}</h3>
-            <div className="muted" style={{ fontSize: 12 }}>
-              Internal notes are not printed. Attachments are stored privately.
-            </div>
-          </div>
-          <button type="button" className="link" onClick={onClose} aria-label="Close">✕</button>
-        </div>
-
+    <Modal
+      title={title || "Document activity"}
+      subtitle="Internal notes are not printed. Attachments are stored privately."
+      onClose={onClose}
+      maxWidth={720}
+    >
         <section style={{ marginBottom: 22 }}>
           <b>Internal notes</b>
           <textarea
@@ -177,7 +172,6 @@ export default function DocumentActivityModal({ documentType, document, title, o
         <div className="modal-actions">
           <button className="btn" onClick={onClose}>Done</button>
         </div>
-      </div>
-    </div>
+    </Modal>
   );
 }

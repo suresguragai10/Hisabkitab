@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { subscribeDialog, getDialogState, subscribeToast } from "../lib/dialogs";
+import Modal from "./Modal";
 
 function ConfirmBody({ req }) {
   return (
@@ -52,22 +53,13 @@ export default function DialogHost() {
   return (
     <>
       {req && (
-        <div className="modal-overlay" role="dialog" aria-modal="true" aria-label={req.title}>
-          <div className="modal-card" style={{ maxWidth: 400 }}>
-            <div className="modal-head">
-              <h3>{req.title}</h3>
-              <button
-                type="button"
-                className="link"
-                aria-label="Close"
-                onClick={() => req.resolve(req.kind === "confirm" ? false : null)}
-              >
-                ✕
-              </button>
-            </div>
-            {req.kind === "confirm" ? <ConfirmBody req={req} /> : <PromptBody req={req} />}
-          </div>
-        </div>
+        <Modal
+          title={req.title}
+          maxWidth={400}
+          onClose={() => req.resolve(req.kind === "confirm" ? false : null)}
+        >
+          {req.kind === "confirm" ? <ConfirmBody req={req} /> : <PromptBody req={req} />}
+        </Modal>
       )}
       {toasts.length > 0 && (
         <div className="toast-stack">
