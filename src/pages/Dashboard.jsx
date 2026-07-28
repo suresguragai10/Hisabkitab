@@ -1,6 +1,9 @@
 import React, { useEffect, useState } from "react";
 import { supabase } from "../supabase";
 import { formatMoney } from "../lib/format";
+import PageHeader from "../components/PageHeader";
+import Money from "../components/Money";
+import StatusBadge from "../components/StatusBadge";
 
 const fmt  = formatMoney;
 const fmtK = (n) => {
@@ -68,10 +71,9 @@ export default function Dashboard({ refreshKey, onNav }) {
 
   return (
     <div className="panel">
-      <div className="panel-head">
-        <h2>Dashboard (ड्यासबोर्ड)</h2>
+      <PageHeader title="Dashboard (ड्यासबोर्ड)">
         <button className="ghost-btn" onClick={load}>↻ Refresh</button>
-      </div>
+      </PageHeader>
 
       {err && <p className="msg err">{err}</p>}
 
@@ -234,7 +236,7 @@ export default function Dashboard({ refreshKey, onNav }) {
                     {stats.top_overdue_customers.map((c,idx)=>(
                       <tr key={idx}>
                         <td style={{fontSize:12,maxWidth:120,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{c.party_name}</td>
-                        <td className="num" style={{fontSize:12,color:"var(--rust)"}}>NPR {Number(c.amount).toLocaleString()}</td>
+                        <td className="num" style={{fontSize:12,color:"var(--rust)"}}><Money value={c.amount} /></td>
                       </tr>
                     ))}
                   </tbody>
@@ -257,8 +259,8 @@ export default function Dashboard({ refreshKey, onNav }) {
                       <tr key={i.id}>
                         <td style={{fontSize:12}}>{i.fiscal_year}-{String(i.invoice_number).padStart(4,"0")}</td>
                         <td style={{maxWidth:100,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{i.party_name}</td>
-                        <td className="num" style={{fontSize:12}}>NPR {Number(i.total).toLocaleString()}</td>
-                        <td><span className={"status-"+i.status} style={{fontSize:11}}>{i.status}</span></td>
+                        <td className="num" style={{fontSize:12}}><Money value={i.total} /></td>
+                        <td style={{fontSize:11}}><StatusBadge status={i.status} /></td>
                       </tr>
                     ))}
                   </tbody>
