@@ -18,6 +18,7 @@ import {
 import { todayLocalDate, toLocalDateString } from "../lib/nepaliCalendar";
 import { useBusinessProfile } from "../lib/businessProfile";
 import ReportLetterhead from "../components/ReportLetterhead";
+import { formatMoney } from "../lib/format";
 
 class ReportBoundary extends Component {
   constructor(props) { super(props); this.state = { error: null }; }
@@ -42,10 +43,7 @@ const REPORTS = [
   ["stock", "Stock Valuation", "asof"],
 ];
 
-const money = (value) => Number(value || 0).toLocaleString(undefined, {
-  minimumFractionDigits: 2,
-  maximumFractionDigits: 2,
-});
+const money = formatMoney;
 const signedMoney = (value) => Number(value || 0) < 0 ? `(${money(Math.abs(Number(value)))})` : money(value);
 const titleCase = (value) => String(value || "").replaceAll("_", " ").replace(/\b\w/g, (c) => c.toUpperCase());
 const today = () => todayLocalDate();

@@ -5,10 +5,11 @@ import { currentFiscalYear } from "../lib/fiscalYear";
 import { formatDualDate, todayLocalDate } from "../lib/nepaliCalendar";
 import { listParties } from "../lib/db";
 import { useBusinessProfile } from "../lib/businessProfile";
+import { formatMoney } from "../lib/format";
 
 // TDS types are loaded from the database via useTaxRates()
 
-const fmt = (n) => Number(n||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2});
+const fmt = formatMoney;
 
 // ── DB helpers ────────────────────────────────────────────────
 async function listEntries(status) {

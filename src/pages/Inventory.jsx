@@ -8,12 +8,10 @@ import {
 } from "../lib/inventory";
 import { currentFiscalYear } from "../lib/fiscalYear";
 import { todayLocalDate } from "../lib/nepaliCalendar";
+import { formatMoney } from "../lib/format";
 
 const TODAY = () => todayLocalDate();
-const fmt = (n, digits = 2) => Number(n || 0).toLocaleString("en-IN", {
-  minimumFractionDigits: digits,
-  maximumFractionDigits: digits,
-});
+const fmt = (n, digits = 2) => formatMoney(n, { locale: "en-IN", minimumFractionDigits: digits, maximumFractionDigits: digits });
 
 const REASONS = [
   { value: "adjustment_in", label: "Stock In / Correction", direction: "in", cost: true },

@@ -3,6 +3,7 @@ import BsDateInput from "../components/BsDateInput";
 import { createVoucher, listAccounts } from "../lib/db";
 import { fiscalYearFor } from "../lib/fiscalYear";
 import { t } from "../lib/i18n";
+import { formatMoney } from "../lib/format";
 
 const VOUCHER_TYPES = [
   { value: "journal", labelKey: "journal", help: "Use for adjustments, accruals, depreciation and other non-cash entries." },
@@ -11,10 +12,7 @@ const VOUCHER_TYPES = [
   { value: "contra", labelKey: "contra", help: "Use for transfers between cash and bank accounts." },
 ];
 
-const money = new Intl.NumberFormat("en-NP", {
-  minimumFractionDigits: 2,
-  maximumFractionDigits: 2,
-});
+const money = { format: (n) => formatMoney(n, { locale: "en-NP" }) };
 
 function localDateString(date = new Date()) {
   const year = date.getFullYear();

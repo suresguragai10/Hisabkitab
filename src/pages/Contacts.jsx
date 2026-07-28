@@ -12,6 +12,7 @@
 
 import React, { useEffect, useMemo, useState } from "react";
 import { confirmDialog } from "../lib/dialogs";
+import { formatMoney } from "../lib/format";
 import {
   listContacts, createContact, updateContact, deactivateContact,
 } from "../lib/contacts";
@@ -24,10 +25,9 @@ const ROLE_TABS = [
   { key: "inactive", label: "Inactive" },
 ];
 
-// Small NPR formatter — keep it lightweight, no library.
 const fmt = (n) => {
   if (n === null || n === undefined || Number.isNaN(Number(n))) return "0";
-  return Number(n).toLocaleString("en-IN", { maximumFractionDigits: 2 });
+  return formatMoney(n, { locale: "en-IN", minimumFractionDigits: 0 });
 };
 
 // Present an outstanding balance in plain-language terms a business

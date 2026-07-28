@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from "react";
 import { supabase } from "../supabase";
+import { formatMoney } from "../lib/format";
 
-const fmt  = (n) => Number(n||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2});
+const fmt  = formatMoney;
 const fmtK = (n) => {
   const v = Number(n||0);
   if (v >= 10000000) return (v/10000000).toFixed(1) + " Cr";

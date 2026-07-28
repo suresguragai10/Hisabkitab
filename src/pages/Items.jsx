@@ -13,6 +13,7 @@ import {
 } from "../lib/items";
 import { listContacts } from "../lib/contacts";
 import { confirmDialog } from "../lib/dialogs";
+import { formatMoney } from "../lib/format";
 
 const ITEM_TYPES = [
   { key: "goods",         label: "Goods (tracked in inventory)" },
@@ -22,7 +23,7 @@ const ITEM_TYPES = [
 
 const UNITS = ["pcs", "kg", "gm", "ltr", "ml", "box", "ctn", "pack", "dozen", "meter", "sqft"];
 
-const fmt = (n) => Number(n || 0).toLocaleString("en-IN", { maximumFractionDigits: 2 });
+const fmt = (n) => formatMoney(n, { locale: "en-IN", minimumFractionDigits: 0 });
 
 const BLANK = {
   name: "", nameNp: "", sku: "", hsnCode: "", brand: "",

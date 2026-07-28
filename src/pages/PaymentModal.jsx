@@ -5,11 +5,9 @@ import {
   reversePaymentAllocation,
 } from "../lib/posting";
 import { todayLocalDate } from "../lib/nepaliCalendar";
+import { formatMoney } from "../lib/format";
 
-const fmt = (n) => Number(n || 0).toLocaleString(undefined, {
-  minimumFractionDigits: 2,
-  maximumFractionDigits: 2,
-});
+const fmt = formatMoney;
 
 // Payment modal shared by invoices and purchase bills.
 // The database remains authoritative for allocation totals and overpayment checks.

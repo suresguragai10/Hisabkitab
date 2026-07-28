@@ -1,10 +1,8 @@
 import React, { useEffect, useState } from "react";
 import { listVouchers, voidVoucher } from "../lib/db";
+import { formatMoney } from "../lib/format";
 
-const money = new Intl.NumberFormat("en-NP", {
-  minimumFractionDigits: 2,
-  maximumFractionDigits: 2,
-});
+const money = { format: (n) => formatMoney(n, { locale: "en-NP" }) };
 
 const TYPE_LABELS = {
   journal: "Journal",

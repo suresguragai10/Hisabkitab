@@ -7,7 +7,7 @@ function ConfirmBody({ req }) {
       <p className="modal-copy">{req.message}</p>
       <div className="modal-actions">
         <button type="button" className="ghost-btn" onClick={() => req.resolve(false)}>Cancel</button>
-        <button type="button" className="btn" onClick={() => req.resolve(true)}>{req.confirmLabel}</button>
+        <button type="button" className={"btn" + (req.danger ? " danger-btn" : "")} onClick={() => req.resolve(true)}>{req.confirmLabel}</button>
       </div>
     </>
   );

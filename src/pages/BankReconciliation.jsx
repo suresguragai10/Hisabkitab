@@ -4,8 +4,9 @@ import { currentFiscalYear } from "../lib/fiscalYear";
 import { todayLocalDate, toLocalDateString } from "../lib/nepaliCalendar";
 import { useBusinessProfile } from "../lib/businessProfile";
 import { confirmDialog } from "../lib/dialogs";
+import { formatMoney } from "../lib/format";
 
-const fmt  = (n) => Number(n||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2});
+const fmt  = formatMoney;
 const fmtD = (d) => d ? new Date(d).toLocaleDateString("en-NP") : "—";
 
 // ── DB helpers ────────────────────────────────────────────────

@@ -3,6 +3,7 @@ import { supabase } from "../supabase";
 import { currentFiscalYear } from "../lib/fiscalYear";
 import { useWorkspace } from "../lib/workspace";
 import { downloadCsv } from "../lib/reports";
+import { formatMoney } from "../lib/format";
 
 const ANNEX13_COLUMNS = [
   { label: "Party Name",        value: "party_name" },
@@ -23,7 +24,7 @@ async function listFiscalYearsWithPeriods() {
   return [...new Set((data || []).map(r => r.fiscal_year))].sort().reverse();
 }
 
-const fmt = (n) => Number(n||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2});
+const fmt = formatMoney;
 
 const SOURCE_LABELS = {
   sales_invoice: "Sales Invoice",

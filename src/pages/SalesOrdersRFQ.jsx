@@ -17,10 +17,11 @@ import {
 } from "../lib/lifecycle";
 import LifecycleActionModal from "../components/LifecycleActionModal";
 import { showToast, confirmDialog } from "../lib/dialogs";
+import { formatMoney } from "../lib/format";
 
 const VAT_RATE = 13;
 const blankLine = () => ({ itemId: "", description: "", quantity: "1", unit: "pcs", rate: "", vatRate: VAT_RATE });
-const fmt = (n) => Number(n || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const fmt = formatMoney;
 function calcAmount(l) { return (parseFloat(l.quantity) || 0) * (parseFloat(l.rate) || 0); }
 function calcVat(l) { return calcAmount(l) * ((parseFloat(l.vatRate) || 0) / 100); }
 

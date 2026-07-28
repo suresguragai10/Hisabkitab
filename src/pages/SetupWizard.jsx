@@ -2,8 +2,9 @@ import React, { useState } from "react";
 import { supabase } from "../supabase";
 import { fiscalYearFor } from "../lib/fiscalYear";
 import { todayLocalDate } from "../lib/nepaliCalendar";
+import { formatMoney } from "../lib/format";
 
-const fmt = (n) => Number(n||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2});
+const fmt = formatMoney;
 
 // ── Business type options ─────────────────────────────────────
 const BIZ_TYPES = [

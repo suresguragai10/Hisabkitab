@@ -27,7 +27,12 @@ export function confirmDialog(message, opts = {}) {
       message,
       title: opts.title || "Please confirm",
       confirmLabel: opts.confirmLabel || "Confirm",
-      danger: opts.danger !== false,
+      // Opt-in, not opt-out: DialogHost previously never rendered this at
+      // all (dead prop), so every existing confirmDialog() call site in
+      // the app today relies on the plain button look. Defaulting to
+      // true here would silently turn every one of them red, including
+      // non-destructive confirmations (e.g. "Confirm this sales order?").
+      danger: opts.danger === true,
       resolve: (value) => {
         setState(null);
         resolve(value);

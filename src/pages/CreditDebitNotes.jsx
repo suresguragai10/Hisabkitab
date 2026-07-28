@@ -5,11 +5,9 @@ import { todayLocalDate } from "../lib/nepaliCalendar";
 import LifecycleActionModal from "../components/LifecycleActionModal";
 import DocumentActivityModal from "../components/DocumentActivityModal";
 import { useBusinessProfile } from "../lib/businessProfile";
+import { formatMoney } from "../lib/format";
 
-const fmt = (value) => Number(value || 0).toLocaleString(undefined, {
-  minimumFractionDigits: 2,
-  maximumFractionDigits: 2,
-});
+const fmt = formatMoney;
 
 function NotePrint({ note, noteType, profile, onClose }) {
   const credit = noteType === "cn";

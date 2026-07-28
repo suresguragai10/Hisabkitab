@@ -639,7 +639,18 @@ function Authed({ session, lang, toggleLang }) {
 
 function Style() {
   return <style>{`
-  :root{--ink:#10211b;--ink2:#3a4f47;--paper:#f6f4ec;--card:#fffdf7;--line:#e2ddcd;--green:#1f6f54;--green2:#15543f;--gold:#b9892f;--rust:#a23b22;}
+  :root{
+    --ink:#10211b;--ink2:#3a4f47;--paper:#f6f4ec;--card:#fffdf7;--line:#e2ddcd;--green:#1f6f54;--green2:#15543f;--gold:#b9892f;--rust:#a23b22;
+    /* Design tokens (audit 4.1) -- defined for new/updated components to
+       consume going forward. Not retrofitted across every existing rule
+       in this pass; that's a separate, larger follow-up. Breakpoints are
+       listed as a comment, not a variable, since CSS custom properties
+       cannot be used inside @media conditions. */
+    --space-1:4px;--space-2:8px;--space-3:12px;--space-4:16px;--space-5:20px;--space-6:24px;--space-8:32px;
+    --radius-sm:8px;--radius-md:12px;--radius-lg:16px;--radius-xl:20px;
+    --shadow-sm:0 2px 10px #00000030;--shadow-md:0 12px 34px #10211b0f;--shadow-lg:0 20px 60px #00000040;
+    /* Breakpoint reference (not a usable var): sidebar collapses <= 880px */
+  }
   *{box-sizing:border-box}
   body{margin:0}
   .wrap{font-family:'Inter','Segoe UI',system-ui,sans-serif;color:var(--ink);background:radial-gradient(1200px 400px at 80% -10%,#eef3ec 0,transparent 60%),var(--paper);min-height:100vh}
@@ -695,6 +706,11 @@ function Style() {
   .muted{color:var(--ink2)}
   .tag{display:inline-block;margin-left:8px;font-size:10.5px;background:#1f6f5414;color:var(--green2);padding:2px 7px;border-radius:6px}
   .tag-void{background:#a23b2214;color:var(--rust)}
+  /* .badge was already used in JSX (ItemCategories.jsx, Contacts.jsx) with
+     no matching rule -- those spans rendered as bare colored text with no
+     shape at all. Base pill shape only; call sites still supply their own
+     background tint inline, same as before. */
+  .badge{display:inline-block;padding:2px 10px;border-radius:var(--radius-md);font-size:11px;font-weight:600;background:var(--line);color:var(--ink)}
   tr.voided{opacity:.55;text-decoration:line-through}
   .acct-group{margin-bottom:16px}
   .acct-group-title{font-size:12px;font-weight:700;color:var(--gold);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px}
@@ -869,6 +885,7 @@ function Style() {
   .toast{background:#222;color:#fff;padding:10px 16px;border-radius:8px;font-size:13px;box-shadow:0 8px 24px #00000040;animation:toast-in .15s ease-out}
   .toast-error{background:var(--rust,#a33)}
   .toast-success{background:#1e7e34}
+  .toast-info{background:var(--green2)}
   @keyframes toast-in{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
   .pay-summary{background:#f8f8f6;border-radius:10px;padding:12px 16px;margin-bottom:16px}
   .pay-summary-row{display:flex;justify-content:space-between;font-size:13px;padding:3px 0}

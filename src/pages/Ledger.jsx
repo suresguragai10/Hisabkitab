@@ -4,11 +4,9 @@ import { downloadCsv, getGeneralLedgerReport, getReportFiscalYears } from "../li
 import { todayLocalDate, toLocalDateString } from "../lib/nepaliCalendar";
 import { useBusinessProfile } from "../lib/businessProfile";
 import ReportLetterhead from "../components/ReportLetterhead";
+import { formatMoney } from "../lib/format";
 
-const money = (value) => Number(value || 0).toLocaleString(undefined, {
-  minimumFractionDigits: 2,
-  maximumFractionDigits: 2,
-});
+const money = formatMoney;
 const balance = (value) => `${money(Math.abs(Number(value || 0)))} ${Number(value || 0) >= 0 ? "Dr" : "Cr"}`;
 const today = () => todayLocalDate();
 const defaultFrom = () => {
