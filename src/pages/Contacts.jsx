@@ -13,6 +13,8 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { confirmDialog } from "../lib/dialogs";
 import { formatMoney } from "../lib/format";
+import PageHeader from "../components/PageHeader";
+import Money from "../components/Money";
 import {
   listContacts, createContact, updateContact, deactivateContact,
 } from "../lib/contacts";
@@ -29,6 +31,7 @@ const fmt = (n) => {
   if (n === null || n === undefined || Number.isNaN(Number(n))) return "0";
   return formatMoney(n, { locale: "en-IN", minimumFractionDigits: 0 });
 };
+const moneyOpts = { locale: "en-IN", minimumFractionDigits: 0 };
 
 // Present an outstanding balance in plain-language terms a business
 // owner understands, colored by direction. Customer outstanding > 0
@@ -47,16 +50,16 @@ function OutstandingCell({ contact }) {
   const youOwe  = contact.is_vendor   && v < 0;
   if (owesYou) {
     return <span style={{ color: "var(--ok,#0a7a2f)", fontWeight: 600 }}>
-      Owes you NPR {fmt(v)}
+      Owes you <Money value={v} options={moneyOpts} />
     </span>;
   }
   if (youOwe) {
     return <span style={{ color: "var(--rust,#a4442d)", fontWeight: 600 }}>
-      You owe NPR {fmt(Math.abs(v))}
+      You owe <Money value={Math.abs(v)} options={moneyOpts} />
     </span>;
   }
   // Fallback: show magnitude with sign hint
-  return <span>NPR {fmt(v)} {v > 0 ? "Dr" : "Cr"}</span>;
+  return <span><Money value={v} options={moneyOpts} /> {v > 0 ? "Dr" : "Cr"}</span>;
 }
 
 const BLANK_FORM = {
@@ -95,10 +98,9 @@ function ContactFormModal({ initial, onSave, onCancel, busy, err }) {
     <div className="modal-overlay" onClick={onCancel}>
       <div className="modal" onClick={(e) => e.stopPropagation()}
            style={{ maxWidth: 720, width: "94%", maxHeight: "90vh", overflowY: "auto" }}>
-        <div className="panel-head">
-          <h3>{initial?.id ? "Edit Contact" : "New Contact"}</h3>
+        <PageHeader title={initial?.id ? "Edit Contact" : "New Contact"} as="h3">
           <button className="link" onClick={onCancel}>✕</button>
-        </div>
+        </PageHeader>
 
         <form onSubmit={submit} style={{ display: "grid", gap: 12, padding: 16 }}>
           {/* Role — the most important field. Presented as two clear checkboxes. */}
@@ -295,17 +297,11 @@ export default function Contacts({ userId, onChanged, onViewStatement }) {
 
   return (
     <div className="panel">
-      <div className="panel-head">
-        <div>
-          <h2>Contacts</h2>
-          <div className="muted" style={{ fontSize: 13 }}>
-            One record per business. Customers, vendors, or both — used across invoices, bills, and reports.
-          </div>
-        </div>
+      <PageHeader title="Contacts" subtitle="One record per business. Customers, vendors, or both — used across invoices, bills, and reports.">
         <button className="btn" onClick={() => { setEditing(null); setShowForm(true); }}>
           + New Contact
         </button>
-      </div>
+      </PageHeader>
 
       {/* Tabs */}
       <div style={{ display: "flex", gap: 6, flexWrap: "wrap", padding: "10px 16px", borderBottom: "1px solid #eee" }}>

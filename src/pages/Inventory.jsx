@@ -9,9 +9,12 @@ import {
 import { currentFiscalYear } from "../lib/fiscalYear";
 import { todayLocalDate } from "../lib/nepaliCalendar";
 import { formatMoney } from "../lib/format";
+import PageHeader from "../components/PageHeader";
+import Money from "../components/Money";
 
 const TODAY = () => todayLocalDate();
 const fmt = (n, digits = 2) => formatMoney(n, { locale: "en-IN", minimumFractionDigits: digits, maximumFractionDigits: digits });
+const moneyOpts = { locale: "en-IN" };
 
 const REASONS = [
   { value: "adjustment_in", label: "Stock In / Correction", direction: "in", cost: true },
@@ -69,10 +72,10 @@ function ReconciliationPanel({ stats, loading, onRefresh, onReconciled }) {
       {stats && (
         <>
           <div className="stat-row" style={{ marginTop: 12 }}>
-            <div className="stat"><span>NPR {fmt(stats.stock_valuation)}</span>Stock valuation</div>
-            <div className="stat"><span>NPR {fmt(stats.inventory_ledger_balance)}</span>Inventory Asset ledger</div>
+            <div className="stat"><span><Money value={stats.stock_valuation} options={moneyOpts} /></span>Stock valuation</div>
+            <div className="stat"><span><Money value={stats.inventory_ledger_balance} options={moneyOpts} /></span>Inventory Asset ledger</div>
             <div className="stat">
-              <span style={{ color: balanced ? "var(--green2)" : "var(--rust)" }}>NPR {fmt(difference)}</span>
+              <span style={{ color: balanced ? "var(--green2)" : "var(--rust)" }}><Money value={difference} options={moneyOpts} /></span>
               Difference
             </div>
             <div className="stat"><span>{Number(stats.legacy_movements || 0)}</span>Legacy movements</div>
@@ -227,22 +230,16 @@ export default function Inventory() {
 
   return (
     <div className="panel">
-      <div className="panel-head">
-        <div>
-          <h2>Inventory (स्टक)</h2>
-          <div className="muted" style={{ fontSize: 13 }}>
-            Quantity, weighted-average cost, stock value, COGS, and Inventory Asset are updated together in PostgreSQL.
-          </div>
-        </div>
+      <PageHeader title="Inventory (स्टक)" subtitle="Quantity, weighted-average cost, stock value, COGS, and Inventory Asset are updated together in PostgreSQL.">
         <button className="btn" onClick={() => setShowMoveForm((v) => !v)}>
           {showMoveForm ? "Cancel" : "+ Stock Adjustment"}
         </button>
-      </div>
+      </PageHeader>
 
       <div className="stat-row">
         <div className="stat"><span>{items.length}</span>Tracked Items</div>
         <div className="stat"><span style={{ color: lowStockCount ? "var(--rust)" : "var(--green2)" }}>{lowStockCount}</span>Low Stock</div>
-        <div className="stat"><span>NPR {fmt(totalStockValue)}</span>Weighted-Average Value</div>
+        <div className="stat"><span><Money value={totalStockValue} options={moneyOpts} /></span>Weighted-Average Value</div>
       </div>
 
       <ReconciliationPanel
@@ -344,7 +341,7 @@ export default function Inventory() {
               ))}
             </tbody>
             <tfoot>
-              <tr><td colSpan={5} className="muted">Total inventory valuation</td><td className="num"><b>NPR {fmt(totalStockValue)}</b></td><td colSpan={2} /></tr>
+              <tr><td colSpan={5} className="muted">Total inventory valuation</td><td className="num"><b><Money value={totalStockValue} options={moneyOpts} /></b></td><td colSpan={2} /></tr>
             </tfoot>
           </table>
         </div>
@@ -352,10 +349,9 @@ export default function Inventory() {
 
       {selectedItem && (
         <div className="panel" style={{ marginTop: 16 }}>
-          <div className="panel-head">
-            <h2>Valuation History — {selectedItem.name}</h2>
+          <PageHeader title={`Valuation History — ${selectedItem.name}`}>
             <button className="link" onClick={() => { setSelectedItem(null); setMovements([]); }}>✕ Close</button>
-          </div>
+          </PageHeader>
           {movLoading ? <p className="note">Loading…</p> : movements.length === 0 ? (
             <p className="note">No movements recorded.</p>
           ) : (
