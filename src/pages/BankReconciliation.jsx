@@ -5,6 +5,9 @@ import { todayLocalDate, toLocalDateString } from "../lib/nepaliCalendar";
 import { useBusinessProfile } from "../lib/businessProfile";
 import { confirmDialog } from "../lib/dialogs";
 import { formatMoney } from "../lib/format";
+import PageHeader from "../components/PageHeader";
+import Money from "../components/Money";
+import StatusBadge from "../components/StatusBadge";
 
 const fmt  = formatMoney;
 const fmtD = (d) => d ? new Date(d).toLocaleDateString("en-NP") : "—";
@@ -275,8 +278,7 @@ export default function BankReconciliation() {
 
   return (
     <div className="panel">
-      <div className="panel-head">
-        <h2>Bank Reconciliation (बैंक मिलान)</h2>
+      <PageHeader title="Bank Reconciliation (बैंक मिलान)">
         {!activeStmt && (
           <button className="btn" onClick={()=>setShowNewStmt(s=>!s)}>
             {showNewStmt ? "Cancel" : "+ New Reconciliation"}
@@ -293,7 +295,7 @@ export default function BankReconciliation() {
             </button>
           </div>
         )}
-      </div>
+      </PageHeader>
 
       {err && <p className="msg err">{err}</p>}
 
@@ -334,9 +336,9 @@ export default function BankReconciliation() {
                 <tr key={s.id}>
                   <td><b>{s.account_name}</b></td>
                   <td style={{fontSize:12}}>{s.from_date} → {s.to_date}</td>
-                  <td className="num">{fmt(s.opening_balance)}</td>
-                  <td className="num">{fmt(s.closing_balance)}</td>
-                  <td><span className={s.status==="reconciled"?"status-paid":"status-sent"}>{s.status}</span></td>
+                  <td className="num"><Money value={s.opening_balance} currency="" /></td>
+                  <td className="num"><Money value={s.closing_balance} currency="" /></td>
+                  <td><StatusBadge status={s.status==="reconciled"?"paid":"sent"} label={s.status.charAt(0).toUpperCase()+s.status.slice(1)} /></td>
                   <td><button className="link" onClick={()=>loadLines(s)}>Open →</button></td>
                 </tr>
               ))}
@@ -351,13 +353,13 @@ export default function BankReconciliation() {
         <>
           {/* Summary bar */}
           <div className="stat-row" style={{marginBottom:8}}>
-            <div className="stat"><span>NPR {fmt(activeStmt.opening_balance)}</span>Opening (Bank)</div>
-            <div className="stat"><span style={{color:"var(--green2)"}}>NPR {fmt(totalDep)}</span>Deposits</div>
-            <div className="stat"><span style={{color:"var(--rust)"}}>NPR {fmt(totalWith)}</span>Withdrawals</div>
-            <div className="stat"><span>NPR {fmt(activeStmt.closing_balance)}</span>Closing (Bank)</div>
+            <div className="stat"><span><Money value={activeStmt.opening_balance} /></span>Opening (Bank)</div>
+            <div className="stat"><span style={{color:"var(--green2)"}}><Money value={totalDep} /></span>Deposits</div>
+            <div className="stat"><span style={{color:"var(--rust)"}}><Money value={totalWith} /></span>Withdrawals</div>
+            <div className="stat"><span><Money value={activeStmt.closing_balance} /></span>Closing (Bank)</div>
             <div className="stat">
               <span style={{color:isBalanced?"var(--green2)":"var(--rust)"}}>
-                {isBalanced ? "✓ Balanced" : "Δ " + fmt(Math.abs(diff))}
+                {isBalanced ? "✓ Balanced" : <>Δ <Money value={Math.abs(diff)} currency="" /></>}
               </span>
               Difference
             </div>
@@ -365,8 +367,8 @@ export default function BankReconciliation() {
 
           {!isBalanced && (
             <div className="msg err" style={{marginBottom:12}}>
-              ⚠ Difference of NPR {fmt(Math.abs(diff))}. 
-              Unmatched deposits: NPR {fmt(unmatchedDep)} | Unmatched withdrawals: NPR {fmt(unmatchedWith)}
+              ⚠ Difference of <Money value={Math.abs(diff)} />.
+              Unmatched deposits: <Money value={unmatchedDep} /> | Unmatched withdrawals: <Money value={unmatchedWith} />
             </div>
           )}
           {isBalanced && (
@@ -447,9 +449,9 @@ export default function BankReconciliation() {
                           )}
                         </div>
                         <div style={{textAlign:"right",minWidth:80}}>
-                          {Number(l.deposits)>0  && <div style={{color:"var(--green2)",fontWeight:700,fontSize:13}}>+{fmt(l.deposits)}</div>}
-                          {Number(l.withdrawals)>0&&<div style={{color:"var(--rust)",fontWeight:700,fontSize:13}}>−{fmt(l.withdrawals)}</div>}
-                          {l.balance!=null && <div style={{fontSize:10,color:"var(--ink2)"}}>{fmt(l.balance)}</div>}
+                          {Number(l.deposits)>0  && <div style={{color:"var(--green2)",fontWeight:700,fontSize:13}}>+<Money value={l.deposits} currency="" /></div>}
+                          {Number(l.withdrawals)>0&&<div style={{color:"var(--rust)",fontWeight:700,fontSize:13}}>−<Money value={l.withdrawals} currency="" /></div>}
+                          {l.balance!=null && <div style={{fontSize:10,color:"var(--ink2)"}}><Money value={l.balance} currency="" /></div>}
                         </div>
                       </div>
                       {l.is_matched && (
@@ -484,8 +486,8 @@ export default function BankReconciliation() {
                           <div style={{fontSize:11,color:"var(--ink2)",marginTop:1}}>{v.vouchers?.narration||"—"}</div>
                         </div>
                         <div style={{textAlign:"right",minWidth:80}}>
-                          {Number(v.debit)>0  && <div style={{color:"var(--green2)",fontWeight:700,fontSize:13}}>+{fmt(v.debit)}</div>}
-                          {Number(v.credit)>0 && <div style={{color:"var(--rust)",fontWeight:700,fontSize:13}}>−{fmt(v.credit)}</div>}
+                          {Number(v.debit)>0  && <div style={{color:"var(--green2)",fontWeight:700,fontSize:13}}>+<Money value={v.debit} currency="" /></div>}
+                          {Number(v.credit)>0 && <div style={{color:"var(--rust)",fontWeight:700,fontSize:13}}>−<Money value={v.credit} currency="" /></div>}
                         </div>
                       </div>
                     </div>

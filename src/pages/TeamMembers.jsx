@@ -2,6 +2,8 @@ import React, { useEffect, useState } from "react";
 import { supabase } from "../supabase";
 import { useWorkspace } from "../lib/workspace";
 import { confirmDialog, showToast } from "../lib/dialogs";
+import PageHeader from "../components/PageHeader";
+import StatusBadge from "../components/StatusBadge";
 
 const ROLES = [
   { value: "accountant", label: "Accountant", desc: "Full access except team management" },
@@ -59,19 +61,18 @@ export default function TeamMembers() {
 
   if (role !== "owner") return (
     <div className="panel">
-      <div className="panel-head"><h2>Team Members</h2></div>
+      <PageHeader title="Team Members" />
       <p className="note">Only the business owner can manage team members.</p>
     </div>
   );
 
   return (
     <div className="panel">
-      <div className="panel-head">
-        <h2>Team Members (टीम)</h2>
+      <PageHeader title="Team Members (टीम)">
         <button className="btn" onClick={() => { setShowForm(s=>!s); setInviteLink(null); }}>
           {showForm ? "Cancel" : "+ Invite Member"}
         </button>
-      </div>
+      </PageHeader>
 
       {/* Role guide */}
       <div className="team-role-guide">
@@ -146,9 +147,8 @@ export default function TeamMembers() {
                 <td>{m.member_email}</td>
                 <td><span className={"role-badge role-"+m.role}>{m.role}</span></td>
                 <td>
-                  <span className={m.status === "active" ? "status-paid" : "status-draft"}>
-                    {m.status === "active" ? "Active" : "Pending — awaiting acceptance"}
-                  </span>
+                  <StatusBadge status={m.status === "active" ? "paid" : "draft"}
+                    label={m.status === "active" ? "Active" : "Pending — awaiting acceptance"} />
                 </td>
                 <td className="muted">{m.joined_at ? new Date(m.joined_at).toLocaleDateString() : "—"}</td>
                 <td>
