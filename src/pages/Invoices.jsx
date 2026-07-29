@@ -8,6 +8,9 @@ import { createInvoiceWithPosting, refreshDocumentPaymentStatuses } from "../lib
 import { cancelInvoiceDocument, deleteDocumentDraft, markInvoicePrinted, postInvoiceDraft, saveInvoiceDraft } from "../lib/lifecycle";
 import LifecycleActionModal from "../components/LifecycleActionModal";
 import DocumentActivityModal from "../components/DocumentActivityModal";
+import PageHeader from "../components/PageHeader";
+import Money from "../components/Money";
+import StatusBadge from "../components/StatusBadge";
 import PaymentModal from "./PaymentModal";
 import { showToast } from "../lib/dialogs";
 import { useTaxRates } from "../lib/taxRates";
@@ -502,8 +505,7 @@ export default function Invoices() {
 
   return (
     <div className="panel">
-      <div className="panel-head">
-        <h2>Invoices (कर बीजक)</h2>
+      <PageHeader title="Invoices (कर बीजक)">
         <div style={{ display: "flex", gap: 8 }}>
           <button className="ghost-btn" onClick={() => setShowBiz((current) => !current)}>⚙ Business Info</button>
           <button className="btn" onClick={() => {
@@ -513,16 +515,16 @@ export default function Invoices() {
             {showForm ? "Close Editor" : "+ New Invoice"}
           </button>
         </div>
-      </div>
+      </PageHeader>
 
       {showBiz && !profLoading && profile && (
         <BizProfilePanel profile={profile} onSave={saveProfile} onClose={() => setShowBiz(false)} />
       )}
 
       <div className="stat-row">
-        <div className="stat"><span style={{ color: "var(--gold)" }}>NPR {totalOutstanding.toLocaleString()}</span>Outstanding</div>
-        <div className="stat"><span>NPR {totalCollected.toLocaleString()}</span>Collected</div>
-        <div className="stat"><span>NPR {totalVat.toLocaleString()}</span>Output VAT</div>
+        <div className="stat"><span style={{ color: "var(--gold)" }}><Money value={totalOutstanding} /></span>Outstanding</div>
+        <div className="stat"><span><Money value={totalCollected} /></span>Collected</div>
+        <div className="stat"><span><Money value={totalVat} /></span>Output VAT</div>
         <div className="stat"><span>{invoices.length}</span>Total Invoices</div>
       </div>
 
@@ -630,13 +632,13 @@ export default function Invoices() {
                     </td>
                     <td><span>{invoice.invoice_date_bs || adDateToBsString(invoice.invoice_date)}</span><span className="muted" style={{ fontSize: 11, display: "block" }}>{invoice.invoice_date} AD</span></td>
                     <td>{invoice.party_name}</td>
-                    <td><span className={`status-${lifecycle}`}>{lifecycle}</span></td>
-                    <td>{lifecycle === "posted" ? <span className={`status-${invoice.status}`}>{invoice.status}</span> : "—"}</td>
-                    <td className="num">NPR {Number(invoice.amount_paid || 0).toLocaleString()}</td>
-                    <td className="num"><b>NPR {Number(invoice.outstanding_amount || 0).toLocaleString()}</b></td>
+                    <td><StatusBadge status={lifecycle} /></td>
+                    <td>{lifecycle === "posted" ? <StatusBadge status={invoice.status} /> : "—"}</td>
+                    <td className="num"><Money value={invoice.amount_paid || 0} /></td>
+                    <td className="num"><b><Money value={invoice.outstanding_amount || 0} /></b></td>
                     <td className="num">
-                      <b>NPR {Number(invoice.net_total ?? invoice.total).toLocaleString()}</b>
-                      {Number(invoice.credited_amount || 0) > 0 && <div className="muted" style={{ fontSize: 10 }}>Original {Number(invoice.total).toLocaleString()}</div>}
+                      <b><Money value={invoice.net_total ?? invoice.total} /></b>
+                      {Number(invoice.credited_amount || 0) > 0 && <div className="muted" style={{ fontSize: 10 }}>Original <Money value={invoice.total} /></div>}
                     </td>
                     <td style={{ whiteSpace: "nowrap" }}>
                       {lifecycle !== "draft" && <button className="link" onClick={() => openPrint(invoice)}>Print</button>}
