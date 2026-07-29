@@ -18,7 +18,8 @@ import {
 import { todayLocalDate, toLocalDateString } from "../lib/nepaliCalendar";
 import { useBusinessProfile } from "../lib/businessProfile";
 import ReportLetterhead from "../components/ReportLetterhead";
-import { formatMoney } from "../lib/format";
+import PageHeader from "../components/PageHeader";
+import Money from "../components/Money";
 
 class ReportBoundary extends Component {
   constructor(props) { super(props); this.state = { error: null }; }
@@ -43,8 +44,6 @@ const REPORTS = [
   ["stock", "Stock Valuation", "asof"],
 ];
 
-const money = formatMoney;
-const signedMoney = (value) => Number(value || 0) < 0 ? `(${money(Math.abs(Number(value)))})` : money(value);
 const titleCase = (value) => String(value || "").replaceAll("_", " ").replace(/\b\w/g, (c) => c.toUpperCase());
 const today = () => todayLocalDate();
 const defaultFrom = () => {
@@ -109,7 +108,7 @@ export default function Reports() {
 
   return (
     <div className="panel">
-      <div className="panel-head"><h2>Reports (रिपोर्ट)</h2></div>
+      <PageHeader title="Reports (रिपोर्ट)" />
 
       <div className="filter-tabs" style={{ marginBottom: 16, flexWrap: "wrap" }}>
         {REPORTS.map(([key, label]) => (
@@ -182,7 +181,7 @@ function StatusBanner({ good, goodText, badText, difference }) {
   return (
     <div className={`net-result ${good ? "profit" : "loss"}`} style={{ marginBottom: 16 }}>
       <span>{good ? goodText : badText}</span>
-      {!good && difference !== undefined && <span>Difference: NPR {money(difference)}</span>}
+      {!good && difference !== undefined && <span>Difference: <Money value={difference} /></span>}
     </div>
   );
 }
@@ -207,19 +206,19 @@ function DayBook({ data }) {
     {(data.rows || []).map((voucher) => <details key={voucher.voucher_id} style={{ borderBottom: "1px solid var(--line)", padding: "10px 0" }}>
       <summary style={{ cursor: "pointer", display: "flex", justifyContent: "space-between", gap: 12 }}>
         <span><b>{voucher.date}</b> · {titleCase(voucher.voucher_type)} #{voucher.voucher_number} · {voucher.narration || "—"}</span>
-        <span>NPR {money(voucher.debit)}</span>
+        <span><Money value={voucher.debit} /></span>
       </summary>
       <div className="table-scroll">
       <table className="tbl" style={{ marginTop: 10 }}>
         <thead><tr><th>Account</th><th>Description</th><th className="num">Debit</th><th className="num">Credit</th></tr></thead>
         <tbody>{(voucher.lines || []).map((line) => <tr key={line.line_id}>
           <td>{line.account_code} · {line.account_name}</td><td>{line.description || "—"}</td>
-          <td className="num">{Number(line.debit) ? money(line.debit) : ""}</td><td className="num">{Number(line.credit) ? money(line.credit) : ""}</td>
+          <td className="num">{Number(line.debit) ? <Money value={line.debit} currency="" /> : ""}</td><td className="num">{Number(line.credit) ? <Money value={line.credit} currency="" /> : ""}</td>
         </tr>)}</tbody>
       </table>
       </div>
     </details>)}
-    <p className="note">Total debit: <b>NPR {money(data.total_debit)}</b> · Total credit: <b>NPR {money(data.total_credit)}</b></p>
+    <p className="note">Total debit: <b><Money value={data.total_debit} /></b> · Total credit: <b><Money value={data.total_credit} /></b></p>
   </div>;
 }
 
@@ -231,9 +230,9 @@ function TrialBalance({ data, onDrill }) {
     <table className="tbl"><thead><tr><th>Account</th><th>Report class</th><th className="num">Debit</th><th className="num">Credit</th></tr></thead>
       <tbody>{(data.rows || []).map((row) => <tr key={row.account_id}>
         <td><AccountButton row={row} onDrill={onDrill} /></td><td>{titleCase(row.report_class)}</td>
-        <td className="num">{Number(row.debit) ? money(row.debit) : ""}</td><td className="num">{Number(row.credit) ? money(row.credit) : ""}</td>
+        <td className="num">{Number(row.debit) ? <Money value={row.debit} currency="" /> : ""}</td><td className="num">{Number(row.credit) ? <Money value={row.credit} currency="" /> : ""}</td>
       </tr>)}</tbody>
-      <tfoot><tr><td colSpan={2}><b>Total</b></td><td className="num"><b>{money(data.total_debit)}</b></td><td className="num"><b>{money(data.total_credit)}</b></td></tr></tfoot>
+      <tfoot><tr><td colSpan={2}><b>Total</b></td><td className="num"><b><Money value={data.total_debit} currency="" /></b></td><td className="num"><b><Money value={data.total_credit} currency="" /></b></td></tr></tfoot>
     </table>
     </div>
   </div>;
@@ -243,8 +242,8 @@ function ReportSection({ title, rows, onDrill, total }) {
   return <div className="report-section">
     <div className="report-section-title">{title}</div>
     <table className="tbl"><tbody>{rows.map((row) => <tr key={row.account_id || row.name}>
-      <td><AccountButton row={row} onDrill={onDrill} /></td><td className="num">{signedMoney(row.amount)}</td>
-    </tr>)}</tbody><tfoot><tr><td><b>Total {title}</b></td><td className="num"><b>{signedMoney(total)}</b></td></tr></tfoot></table>
+      <td><AccountButton row={row} onDrill={onDrill} /></td><td className="num"><Money value={row.amount} negativeStyle="parenthesis" currency="" /></td>
+    </tr>)}</tbody><tfoot><tr><td><b>Total {title}</b></td><td className="num"><b><Money value={total} negativeStyle="parenthesis" currency="" /></b></td></tr></tfoot></table>
   </div>;
 }
 
@@ -253,11 +252,11 @@ function ProfitLoss({ data, onDrill }) {
   return <div className="report-wrap"><div className="report-title">Profit & Loss Statement</div><div className="report-period">{data.from} to {data.to}</div>
     <ReportSection title="Revenue" rows={rows.filter((r) => r.report_class === "revenue")} total={data.revenue} onDrill={onDrill} />
     <ReportSection title="Cost of Sales" rows={rows.filter((r) => r.report_class === "cost_of_sales")} total={data.cost_of_sales} onDrill={onDrill} />
-    <div className="net-result profit"><span>Gross Profit</span><span>NPR {signedMoney(data.gross_profit)}</span></div>
+    <div className="net-result profit"><span>Gross Profit</span><span><Money value={data.gross_profit} negativeStyle="parenthesis" /></span></div>
     <ReportSection title="Operating Expense" rows={rows.filter((r) => r.report_class === "operating_expense")} total={data.operating_expense} onDrill={onDrill} />
     <ReportSection title="Other Income" rows={rows.filter((r) => r.report_class === "other_income")} total={data.other_income} onDrill={onDrill} />
     <ReportSection title="Other Expense" rows={rows.filter((r) => r.report_class === "other_expense")} total={data.other_expense} onDrill={onDrill} />
-    <div className={`net-result ${Number(data.net_profit) >= 0 ? "profit" : "loss"}`}><span>Net {Number(data.net_profit) >= 0 ? "Profit" : "Loss"}</span><span>NPR {signedMoney(data.net_profit)}</span></div>
+    <div className={`net-result ${Number(data.net_profit) >= 0 ? "profit" : "loss"}`}><span>Net {Number(data.net_profit) >= 0 ? "Profit" : "Loss"}</span><span><Money value={data.net_profit} negativeStyle="parenthesis" /></span></div>
   </div>;
 }
 
@@ -271,9 +270,9 @@ function BalanceSheet({ data, onDrill }) {
     <StatusBanner good={data.balanced} goodText="Balance Sheet reconciles to the ledger" badText="Assets do not equal liabilities and equity" difference={data.difference} />
     {groups.map(([label, key]) => <ReportSection key={key} title={label} rows={rows.filter((r) => r.report_class === key)} total={rows.filter((r) => r.report_class === key).reduce((sum, row) => sum + Number(row.amount), 0)} onDrill={onDrill} />)}
     <table className="tbl"><tbody>
-      <tr><td>Current earnings</td><td className="num">{signedMoney(data.current_earnings)}</td></tr>
-      <tr><td><b>Total Assets</b></td><td className="num"><b>{money(data.total_assets)}</b></td></tr>
-      <tr><td><b>Total Liabilities & Equity</b></td><td className="num"><b>{money(data.liabilities_and_equity)}</b></td></tr>
+      <tr><td>Current earnings</td><td className="num"><Money value={data.current_earnings} negativeStyle="parenthesis" currency="" /></td></tr>
+      <tr><td><b>Total Assets</b></td><td className="num"><b><Money value={data.total_assets} currency="" /></b></td></tr>
+      <tr><td><b>Total Liabilities & Equity</b></td><td className="num"><b><Money value={data.liabilities_and_equity} currency="" /></b></td></tr>
     </tbody></table>
   </div>;
 }
@@ -283,16 +282,16 @@ function CashFlow({ data }) {
   return <div className="report-wrap"><div className="report-title">Cash Flow Statement</div><div className="report-period">{data.from} to {data.to}</div>
     <StatusBanner good={data.reconciled} goodText="Cash Flow reconciles to cash and bank ledgers" badText="Cash Flow does not reconcile" difference={data.difference} />
     <table className="tbl"><tbody>
-      <tr><td>Opening cash and bank</td><td className="num">{signedMoney(data.opening_cash)}</td></tr>
-      <tr><td>Net cash from operating activities</td><td className="num">{signedMoney(data.operating)}</td></tr>
-      <tr><td>Net cash from investing activities</td><td className="num">{signedMoney(data.investing)}</td></tr>
-      <tr><td>Net cash from financing activities</td><td className="num">{signedMoney(data.financing)}</td></tr>
-      <tr><td><b>Closing cash and bank</b></td><td className="num"><b>{signedMoney(data.closing_cash)}</b></td></tr>
+      <tr><td>Opening cash and bank</td><td className="num"><Money value={data.opening_cash} negativeStyle="parenthesis" currency="" /></td></tr>
+      <tr><td>Net cash from operating activities</td><td className="num"><Money value={data.operating} negativeStyle="parenthesis" currency="" /></td></tr>
+      <tr><td>Net cash from investing activities</td><td className="num"><Money value={data.investing} negativeStyle="parenthesis" currency="" /></td></tr>
+      <tr><td>Net cash from financing activities</td><td className="num"><Money value={data.financing} negativeStyle="parenthesis" currency="" /></td></tr>
+      <tr><td><b>Closing cash and bank</b></td><td className="num"><b><Money value={data.closing_cash} negativeStyle="parenthesis" currency="" /></b></td></tr>
     </tbody></table>
     <div className="report-section-title" style={{ marginTop: 20 }}>Cash movements</div>
     <div className="table-scroll">
     <table className="tbl"><thead><tr><th>Date</th><th>Voucher</th><th>Narration</th><th>Category</th><th className="num">Amount</th></tr></thead>
-      <tbody>{rows.map((row, index) => <tr key={`${row.voucher_id}-${row.cash_flow_category}-${index}`}><td>{row.date}</td><td>{titleCase(row.voucher_type)} #{row.voucher_number}</td><td>{row.narration || "—"}</td><td>{titleCase(row.cash_flow_category)}</td><td className="num">{signedMoney(row.amount)}</td></tr>)}</tbody>
+      <tbody>{rows.map((row, index) => <tr key={`${row.voucher_id}-${row.cash_flow_category}-${index}`}><td>{row.date}</td><td>{titleCase(row.voucher_type)} #{row.voucher_number}</td><td>{row.narration || "—"}</td><td>{titleCase(row.cash_flow_category)}</td><td className="num"><Money value={row.amount} negativeStyle="parenthesis" currency="" /></td></tr>)}</tbody>
     </table>
     </div>
   </div>;
@@ -303,15 +302,15 @@ function Ageing({ data, kind }) {
   return <div className="report-wrap"><div className="report-title">{isReceivable ? "Receivables" : "Payables"} Ageing</div><div className="report-period">As of {data.as_of}</div>
     <StatusBanner good={data.reconciled} goodText="Ageing reconciles to the party ledgers" badText="Ageing differs from the party ledgers" difference={data.difference} />
     <div className="stat-row" style={{ marginBottom: 16 }}>
-      {[['Current',data.current],['1–30 days',data.days_1_30],['31–60 days',data.days_31_60],['61–90 days',data.days_61_90],['Over 90 days',data.over_90]].map(([label, value]) => <div className="stat" key={label}><small>{label}</small><span>{money(value)}</span></div>)}
+      {[['Current',data.current],['1–30 days',data.days_1_30],['31–60 days',data.days_31_60],['61–90 days',data.days_61_90],['Over 90 days',data.over_90]].map(([label, value]) => <div className="stat" key={label}><small>{label}</small><span><Money value={value} currency="" /></span></div>)}
     </div>
     <div className="table-scroll">
     <table className="tbl"><thead><tr><th>Document</th><th>{isReceivable ? "Customer" : "Supplier"}</th><th>Date</th><th>Due</th><th className="num">Net</th><th className="num">Paid</th><th className="num">Outstanding</th><th>Bucket</th></tr></thead>
-      <tbody>{(data.rows || []).map((row) => <tr key={row.document_id}><td>#{isReceivable ? row.invoice_number : row.bill_number}</td><td>{isReceivable ? row.party_name : row.vendor_name}</td><td>{isReceivable ? row.invoice_date : row.bill_date}</td><td>{row.due_date || "—"}</td><td className="num">{money(row.net_amount)}</td><td className="num">{money(row.paid_amount)}</td><td className="num"><b>{money(row.outstanding)}</b></td><td>{titleCase(row.bucket)}</td></tr>)}</tbody>
-      <tfoot><tr><td colSpan={6}><b>Total</b></td><td className="num"><b>{money(data.total)}</b></td><td /></tr></tfoot>
+      <tbody>{(data.rows || []).map((row) => <tr key={row.document_id}><td>#{isReceivable ? row.invoice_number : row.bill_number}</td><td>{isReceivable ? row.party_name : row.vendor_name}</td><td>{isReceivable ? row.invoice_date : row.bill_date}</td><td>{row.due_date || "—"}</td><td className="num"><Money value={row.net_amount} currency="" /></td><td className="num"><Money value={row.paid_amount} currency="" /></td><td className="num"><b><Money value={row.outstanding} currency="" /></b></td><td>{titleCase(row.bucket)}</td></tr>)}</tbody>
+      <tfoot><tr><td colSpan={6}><b>Total</b></td><td className="num"><b><Money value={data.total} currency="" /></b></td><td /></tr></tfoot>
     </table>
     </div>
-    <p className="note">Ledger balance: <b>NPR {money(data.ledger_balance)}</b></p>
+    <p className="note">Ledger balance: <b><Money value={data.ledger_balance} /></b></p>
   </div>;
 }
 
@@ -319,8 +318,8 @@ function Register({ data, kind }) {
   return <div className="report-wrap"><div className="report-title">{kind === "sales" ? "Sales" : "Purchase"} Register</div><div className="report-period">{data.from} to {data.to}</div>
     <div className="table-scroll">
     <table className="tbl"><thead><tr><th>Date</th><th>Type / #</th><th>Party</th><th>PAN/VAT</th><th className="num">Taxable</th><th className="num">VAT</th><th className="num">Total</th></tr></thead>
-      <tbody>{(data.rows || []).map((row) => <tr key={`${row.document_type}-${row.document_id}`}><td>{row.document_date}</td><td>{titleCase(row.document_type)} #{row.document_number}</td><td>{row.party_name}</td><td>{row.pan_vat || "—"}</td><td className="num">{signedMoney(row.subtotal)}</td><td className="num">{signedMoney(row.vat_amount)}</td><td className="num"><b>{signedMoney(row.total)}</b></td></tr>)}</tbody>
-      <tfoot><tr><td colSpan={4}><b>Net total</b></td><td className="num"><b>{signedMoney(data.subtotal)}</b></td><td className="num"><b>{signedMoney(data.vat)}</b></td><td className="num"><b>{signedMoney(data.total)}</b></td></tr></tfoot>
+      <tbody>{(data.rows || []).map((row) => <tr key={`${row.document_type}-${row.document_id}`}><td>{row.document_date}</td><td>{titleCase(row.document_type)} #{row.document_number}</td><td>{row.party_name}</td><td>{row.pan_vat || "—"}</td><td className="num"><Money value={row.subtotal} negativeStyle="parenthesis" currency="" /></td><td className="num"><Money value={row.vat_amount} negativeStyle="parenthesis" currency="" /></td><td className="num"><b><Money value={row.total} negativeStyle="parenthesis" currency="" /></b></td></tr>)}</tbody>
+      <tfoot><tr><td colSpan={4}><b>Net total</b></td><td className="num"><b><Money value={data.subtotal} negativeStyle="parenthesis" currency="" /></b></td><td className="num"><b><Money value={data.vat} negativeStyle="parenthesis" currency="" /></b></td><td className="num"><b><Money value={data.total} negativeStyle="parenthesis" currency="" /></b></td></tr></tfoot>
     </table>
     </div>
   </div>;
@@ -330,13 +329,13 @@ function VatReport({ data }) {
   return <div className="report-wrap"><div className="report-title">VAT Report</div><div className="report-period">{data.from} to {data.to}</div>
     <StatusBanner good={data.reconciled} goodText="VAT documents reconcile to VAT ledgers" badText="VAT documents and ledger differ" difference={Math.max(Math.abs(Number(data.output_variance)), Math.abs(Number(data.input_variance)))} />
     <table className="tbl"><tbody>
-      <tr><td>Output VAT</td><td className="num">{money(data.output_vat)}</td><td className="muted">Ledger {money(data.output_vat_ledger)}</td></tr>
-      <tr><td>Input VAT</td><td className="num">{money(data.input_vat)}</td><td className="muted">Ledger {money(data.input_vat_ledger)}</td></tr>
-      <tr><td><b>Net VAT payable</b></td><td className="num"><b>{signedMoney(data.net_vat_payable)}</b></td><td /></tr>
+      <tr><td>Output VAT</td><td className="num"><Money value={data.output_vat} currency="" /></td><td className="muted">Ledger <Money value={data.output_vat_ledger} currency="" /></td></tr>
+      <tr><td>Input VAT</td><td className="num"><Money value={data.input_vat} currency="" /></td><td className="muted">Ledger <Money value={data.input_vat_ledger} currency="" /></td></tr>
+      <tr><td><b>Net VAT payable</b></td><td className="num"><b><Money value={data.net_vat_payable} negativeStyle="parenthesis" currency="" /></b></td><td /></tr>
     </tbody></table>
     <div className="table-scroll">
     <table className="tbl" style={{ marginTop: 18 }}><thead><tr><th>Date</th><th>Source</th><th>Party</th><th className="num">Output VAT</th><th className="num">Input VAT</th></tr></thead>
-      <tbody>{(data.rows || []).map((row) => <tr key={`${row.source_type}-${row.source_id}`}><td>{row.document_date}</td><td>{titleCase(row.source_type)} #{row.document_number}</td><td>{row.party_name}</td><td className="num">{Number(row.output_vat) ? signedMoney(row.output_vat) : ""}</td><td className="num">{Number(row.input_vat) ? signedMoney(row.input_vat) : ""}</td></tr>)}</tbody>
+      <tbody>{(data.rows || []).map((row) => <tr key={`${row.source_type}-${row.source_id}`}><td>{row.document_date}</td><td>{titleCase(row.source_type)} #{row.document_number}</td><td>{row.party_name}</td><td className="num">{Number(row.output_vat) ? <Money value={row.output_vat} negativeStyle="parenthesis" currency="" /> : ""}</td><td className="num">{Number(row.input_vat) ? <Money value={row.input_vat} negativeStyle="parenthesis" currency="" /> : ""}</td></tr>)}</tbody>
     </table>
     </div>
   </div>;
@@ -347,11 +346,11 @@ function StockValuation({ data }) {
     <StatusBanner good={data.reconciled} goodText="Stock valuation reconciles to Inventory Asset" badText="Stock valuation differs from Inventory Asset" difference={data.difference} />
     <div className="table-scroll">
     <table className="tbl"><thead><tr><th>SKU</th><th>Item</th><th>Category</th><th className="num">Quantity</th><th>Unit</th><th className="num">Average cost</th><th className="num">Value</th></tr></thead>
-      <tbody>{(data.rows || []).map((row) => <tr key={row.item_id}><td>{row.sku || "—"}</td><td>{row.name}</td><td>{row.category_name || "—"}</td><td className="num">{Number(row.quantity).toLocaleString()}</td><td>{row.unit}</td><td className="num">{money(row.average_cost)}</td><td className="num"><b>{money(row.inventory_value)}</b></td></tr>)}</tbody>
-      <tfoot><tr><td colSpan={6}><b>Total stock valuation</b></td><td className="num"><b>{money(data.stock_valuation)}</b></td></tr></tfoot>
+      <tbody>{(data.rows || []).map((row) => <tr key={row.item_id}><td>{row.sku || "—"}</td><td>{row.name}</td><td>{row.category_name || "—"}</td><td className="num">{Number(row.quantity).toLocaleString()}</td><td>{row.unit}</td><td className="num"><Money value={row.average_cost} currency="" /></td><td className="num"><b><Money value={row.inventory_value} currency="" /></b></td></tr>)}</tbody>
+      <tfoot><tr><td colSpan={6}><b>Total stock valuation</b></td><td className="num"><b><Money value={data.stock_valuation} currency="" /></b></td></tr></tfoot>
     </table>
     </div>
-    <p className="note">Inventory Asset ledger: <b>NPR {money(data.inventory_ledger_balance)}</b></p>
+    <p className="note">Inventory Asset ledger: <b><Money value={data.inventory_ledger_balance} /></b></p>
   </div>;
 }
 
@@ -364,12 +363,14 @@ function LedgerDrilldown({ account, fromDate, toDate, fiscalYear, onClose }) {
   }, [account.id, fromDate, toDate, fiscalYear]);
   return <div className="modal-overlay" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
     <div className="modal-card" style={{ maxWidth: 1000 }}>
-      <div className="panel-head"><h3>{account.account_code} · {account.name}</h3><button className="ghost-btn" onClick={onClose}>Close</button></div>
+      <PageHeader title={`${account.account_code} · ${account.name}`} as="h3">
+        <button className="ghost-btn" onClick={onClose}>Close</button>
+      </PageHeader>
       {error && <p className="msg err">{error}</p>}
       {!data ? <p className="note">Loading ledger…</p> : <>
-        <p className="note">Opening: {signedMoney(data.opening_balance)} · Closing: {signedMoney(data.closing_balance)}</p>
+        <p className="note">Opening: <Money value={data.opening_balance} negativeStyle="parenthesis" currency="" /> · Closing: <Money value={data.closing_balance} negativeStyle="parenthesis" currency="" /></p>
         <div style={{ overflowX: "auto" }}><table className="tbl"><thead><tr><th>Date</th><th>Voucher</th><th>Description</th><th className="num">Debit</th><th className="num">Credit</th><th className="num">Balance</th></tr></thead>
-          <tbody>{(data.rows || []).map((row) => <tr key={row.id}><td>{row.date}</td><td>{titleCase(row.voucher_type)} #{row.voucher_number}</td><td>{row.description || row.narration || "—"}</td><td className="num">{Number(row.debit) ? money(row.debit) : ""}</td><td className="num">{Number(row.credit) ? money(row.credit) : ""}</td><td className="num">{signedMoney(row.running_balance)}</td></tr>)}</tbody>
+          <tbody>{(data.rows || []).map((row) => <tr key={row.id}><td>{row.date}</td><td>{titleCase(row.voucher_type)} #{row.voucher_number}</td><td>{row.description || row.narration || "—"}</td><td className="num">{Number(row.debit) ? <Money value={row.debit} currency="" /> : ""}</td><td className="num">{Number(row.credit) ? <Money value={row.credit} currency="" /> : ""}</td><td className="num"><Money value={row.running_balance} negativeStyle="parenthesis" currency="" /></td></tr>)}</tbody>
         </table></div>
       </>}
     </div>
