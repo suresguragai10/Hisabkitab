@@ -1,8 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { listVouchers, voidVoucher } from "../lib/db";
-import { formatMoney } from "../lib/format";
-
-const money = { format: (n) => formatMoney(n, { locale: "en-NP" }) };
+import Money from "../components/Money";
 
 const TYPE_LABELS = {
   journal: "Journal",
@@ -116,7 +114,7 @@ export default function VoucherList({ refreshKey }) {
                         {voucher.voucher_lines.map((line) => line.accounts?.name).filter(Boolean).join(" / ") || "—"}
                       </div>
                     </td>
-                    <td className="num">NPR {money.format(total)}</td>
+                    <td className="num"><Money value={total} options={{ locale: "en-NP" }} /></td>
                     <td>
                       {voucher.narration || "—"}
                       {voucher.is_void && <span className="tag tag-void">Voided: {voucher.void_reason}</span>}

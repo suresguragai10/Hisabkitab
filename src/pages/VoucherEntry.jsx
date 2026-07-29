@@ -3,7 +3,7 @@ import BsDateInput from "../components/BsDateInput";
 import { createVoucher, listAccounts } from "../lib/db";
 import { fiscalYearFor } from "../lib/fiscalYear";
 import { t } from "../lib/i18n";
-import { formatMoney } from "../lib/format";
+import Money from "../components/Money";
 
 const VOUCHER_TYPES = [
   { value: "journal", labelKey: "journal", help: "Use for adjustments, accruals, depreciation and other non-cash entries." },
@@ -12,7 +12,7 @@ const VOUCHER_TYPES = [
   { value: "contra", labelKey: "contra", help: "Use for transfers between cash and bank accounts." },
 ];
 
-const money = { format: (n) => formatMoney(n, { locale: "en-NP" }) };
+const moneyOpts = { locale: "en-NP" };
 
 function localDateString(date = new Date()) {
   const year = date.getFullYear();
@@ -176,7 +176,7 @@ export default function VoucherEntry({ userId, onSaved, lang = "en" }) {
         </div>
         <div className={`voucher-balance ${isBalanced ? "balanced" : "unbalanced"}`}>
           <span>{isBalanced ? "Balanced" : "Difference"}</span>
-          <strong>NPR {money.format(Math.abs(totals.difference))}</strong>
+          <strong><Money value={Math.abs(totals.difference)} options={moneyOpts} /></strong>
         </div>
       </div>
 
@@ -298,8 +298,8 @@ export default function VoucherEntry({ userId, onSaved, lang = "en" }) {
             <tfoot>
               <tr>
                 <td colSpan="3">Totals</td>
-                <td className="num">NPR {money.format(totals.debit)}</td>
-                <td className="num">NPR {money.format(totals.credit)}</td>
+                <td className="num"><Money value={totals.debit} options={moneyOpts} /></td>
+                <td className="num"><Money value={totals.credit} options={moneyOpts} /></td>
                 <td />
               </tr>
             </tfoot>
