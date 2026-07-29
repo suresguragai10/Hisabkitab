@@ -6,6 +6,8 @@ import { formatDualDate, todayLocalDate } from "../lib/nepaliCalendar";
 import { listParties } from "../lib/db";
 import { useBusinessProfile } from "../lib/businessProfile";
 import { formatMoney } from "../lib/format";
+import PageHeader from "../components/PageHeader";
+import Money from "../components/Money";
 
 // TDS types are loaded from the database via useTaxRates()
 
@@ -246,8 +248,7 @@ export default function TDS({ userId }) {
 
   return (
     <div className="panel">
-      <div className="panel-head">
-        <h2>TDS — Tax Deducted at Source</h2>
+      <PageHeader title="TDS — Tax Deducted at Source">
         <div style={{display:"flex",gap:8}}>
           {pending.length > 0 && (
             <button className="ghost-btn" onClick={()=>{setShowRemit(s=>!s);setShowForm(false);}}>
@@ -258,19 +259,19 @@ export default function TDS({ userId }) {
             {showForm?"Cancel":"+ Record TDS"}
           </button>
         </div>
-      </div>
+      </PageHeader>
 
       {/* Summary stats */}
       <div className="stat-row">
-        <div className="stat"><span style={{color:"var(--rust)"}}>NPR {fmt(totalPending)}</span>Pending Remittance</div>
-        <div className="stat"><span>NPR {fmt(totalDeducted)}</span>Deducted (not remitted)</div>
-        <div className="stat"><span style={{color:"var(--green2)"}}>NPR {fmt(totalRemitted)}</span>Remitted to IRD</div>
+        <div className="stat"><span style={{color:"var(--rust)"}}><Money value={totalPending} /></span>Pending Remittance</div>
+        <div className="stat"><span><Money value={totalDeducted} /></span>Deducted (not remitted)</div>
+        <div className="stat"><span style={{color:"var(--green2)"}}><Money value={totalRemitted} /></span>Remitted to IRD</div>
         <div className="stat"><span>{pending.length}</span>Pending entries</div>
       </div>
 
       {totalPending > 0 && (
         <div className="alert-bar">
-          ⚠ NPR {fmt(totalPending)} in TDS is pending remittance to IRD.
+          ⚠ <Money value={totalPending} /> in TDS is pending remittance to IRD.
           IRD deadline: 25th of following month.
           <button className="link" style={{display:"inline",marginLeft:8}} onClick={()=>{setShowRemit(true);setShowForm(false);}}>Remit now →</button>
         </div>
@@ -316,9 +317,9 @@ export default function TDS({ userId }) {
           {/* Live calculation */}
           {parseFloat(form.gross) > 0 && (
             <div className="tds-calc-box">
-              <div className="tds-calc-row"><span>Gross Amount</span><b>NPR {fmt(parseFloat(form.gross))}</b></div>
-              <div className="tds-calc-row" style={{color:"var(--rust)"}}><span>TDS @ {form.rate}%</span><b>− NPR {fmt(tdsAmt)}</b></div>
-              <div className="tds-calc-row tds-calc-total"><span>Net paid to payee</span><b>NPR {fmt(netAmt)}</b></div>
+              <div className="tds-calc-row"><span>Gross Amount</span><b><Money value={parseFloat(form.gross)} /></b></div>
+              <div className="tds-calc-row" style={{color:"var(--rust)"}}><span>TDS @ {form.rate}%</span><b>− <Money value={tdsAmt} /></b></div>
+              <div className="tds-calc-row tds-calc-total"><span>Net paid to payee</span><b><Money value={netAmt} /></b></div>
             </div>
           )}
 
@@ -341,7 +342,7 @@ export default function TDS({ userId }) {
             <div className="tds-calc-box">
               <div className="tds-calc-row tds-calc-total">
                 <span>Total TDS to remit ({selected.size} entries)</span>
-                <b>NPR {fmt(pending.filter(e=>selected.has(e.id)).reduce((s,e)=>s+Number(e.tds_amount),0))}</b>
+                <b><Money value={pending.filter(e=>selected.has(e.id)).reduce((s,e)=>s+Number(e.tds_amount),0)} /></b>
               </div>
             </div>
           )}
@@ -372,7 +373,7 @@ export default function TDS({ userId }) {
                   <tr key={r.id}>
                     <td>{r.remittance_date}</td>
                     <td>{r.period_label}</td>
-                    <td className="num"><b>NPR {fmt(r.total_tds)}</b></td>
+                    <td className="num"><b><Money value={r.total_tds} /></b></td>
                     <td>{r.challan_no||"—"}</td>
                     <td>{r.payment_mode}</td>
                   </tr>
@@ -408,10 +409,10 @@ export default function TDS({ userId }) {
                     <td><span className="tag">{TDS_TYPES.find(t=>t.type===e.tds_type)?.label||e.tds_type}</span></td>
                     <td><b>{e.payee_name}</b></td>
                     <td className="muted" style={{fontSize:11}}>{e.payee_pan||"—"}</td>
-                    <td className="num">{fmt(e.gross_amount)}</td>
+                    <td className="num"><Money value={e.gross_amount} currency="" /></td>
                     <td className="num">{e.tds_rate}%</td>
-                    <td className="num" style={{color:"var(--rust)"}}><b>{fmt(e.tds_amount)}</b></td>
-                    <td className="num">{fmt(e.net_amount)}</td>
+                    <td className="num" style={{color:"var(--rust)"}}><b><Money value={e.tds_amount} currency="" /></b></td>
+                    <td className="num"><Money value={e.net_amount} currency="" /></td>
                     <td><span className={e.status==="remitted"?"status-paid":"status-sent"}>{e.status}</span></td>
                     <td>
                       <button className="link" onClick={()=>{
@@ -428,10 +429,10 @@ export default function TDS({ userId }) {
                 <tr>
                   {showRemit && view==="pending" && <td/>}
                   <td colSpan={4}><b>Total</b></td>
-                  <td className="num"><b>{fmt(allByView.reduce((s,e)=>s+Number(e.gross_amount),0))}</b></td>
+                  <td className="num"><b><Money value={allByView.reduce((s,e)=>s+Number(e.gross_amount),0)} currency="" /></b></td>
                   <td/>
-                  <td className="num"><b>NPR {fmt(allByView.reduce((s,e)=>s+Number(e.tds_amount),0))}</b></td>
-                  <td className="num"><b>{fmt(allByView.reduce((s,e)=>s+Number(e.net_amount),0))}</b></td>
+                  <td className="num"><b><Money value={allByView.reduce((s,e)=>s+Number(e.tds_amount),0)} /></b></td>
+                  <td className="num"><b><Money value={allByView.reduce((s,e)=>s+Number(e.net_amount),0)} currency="" /></b></td>
                   <td colSpan={showRemit && view==="pending"?2:1}/>
                 </tr>
               </tfoot>

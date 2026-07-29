@@ -3,7 +3,8 @@ import { supabase } from "../supabase";
 import { currentFiscalYear } from "../lib/fiscalYear";
 import { useWorkspace } from "../lib/workspace";
 import { downloadCsv } from "../lib/reports";
-import { formatMoney } from "../lib/format";
+import PageHeader from "../components/PageHeader";
+import Money from "../components/Money";
 
 const ANNEX13_COLUMNS = [
   { label: "Party Name",        value: "party_name" },
@@ -23,8 +24,6 @@ async function listFiscalYearsWithPeriods() {
   if (error) throw error;
   return [...new Set((data || []).map(r => r.fiscal_year))].sort().reverse();
 }
-
-const fmt = formatMoney;
 
 const SOURCE_LABELS = {
   sales_invoice: "Sales Invoice",
@@ -126,15 +125,14 @@ export default function VatFiling() {
 
   return (
     <div className="panel">
-      <div className="panel-head">
-        <h2>VAT Filing</h2>
+      <PageHeader title="VAT Filing">
         <label className="fld" style={{ margin: 0, flex: "0 0 160px" }}>
           Fiscal Year
           <select value={fiscalYear} onChange={e => setFiscalYear(e.target.value)} style={{ marginTop: 4 }}>
             {fiscalYears.map(y => <option key={y} value={y}>{y}</option>)}
           </select>
         </label>
-      </div>
+      </PageHeader>
 
       <div className="settings-info-box">
         Each fiscal period can have one VAT working paper. <b>Prepare</b> creates a draft snapshot from your posted
@@ -150,7 +148,7 @@ export default function VatFiling() {
       <div className="stat-row">
         <div className="stat"><span>{returns.filter(r=>!!r.id).length}</span>Periods Prepared</div>
         <div className="stat"><span>{periods.filter(p => !returnFor(p.id)).length}</span>Periods Not Prepared</div>
-        <div className="stat"><span style={{color:"var(--rust)"}}>NPR {fmt(totalFiled)}</span>Total Prepared Net VAT</div>
+        <div className="stat"><span style={{color:"var(--rust)"}}><Money value={totalFiled} /></span>Total Prepared Net VAT</div>
       </div>
 
       {loading ? <p className="note">Loading…</p> : periods.length === 0 ? (
@@ -172,7 +170,7 @@ export default function VatFiling() {
                     <td style={{ fontSize: 12 }}>{p.from_date}</td>
                     <td style={{ fontSize: 12 }}>{p.to_date}</td>
                     <td><span className={s.cls}>{s.label}</span></td>
-                    <td className="num">{r ? `NPR ${fmt(r.snapshot?.net_vat_payable)}` : "—"}</td>
+                    <td className="num">{r ? <Money value={r.snapshot?.net_vat_payable} /> : "—"}</td>
                     <td style={{ whiteSpace: "nowrap" }}>
                       {(!r || r.status === "draft") && canEdit && (
                         <button className="link" disabled={busy} onClick={() => prepare(p)}>
@@ -215,11 +213,11 @@ function VatReturnDetail({ vatReturn }) {
   return (
     <div style={{ padding: "16px 8px", background: "var(--panel2, #f8f8f6)", borderRadius: 8 }}>
       <div className="tds-calc-box">
-        <div className="tds-calc-row"><span>Sales taxable</span><b>NPR {fmt(snap.sales_taxable)}</b></div>
-        <div className="tds-calc-row"><span>Output VAT</span><b>NPR {fmt(snap.output_vat)}</b></div>
-        <div className="tds-calc-row"><span>Purchase taxable</span><b>NPR {fmt(snap.purchase_taxable)}</b></div>
-        <div className="tds-calc-row"><span>Input VAT</span><b>NPR {fmt(snap.input_vat)}</b></div>
-        <div className="tds-calc-row tds-calc-total"><span>Net VAT payable</span><b>NPR {fmt(snap.net_vat_payable)}</b></div>
+        <div className="tds-calc-row"><span>Sales taxable</span><b><Money value={snap.sales_taxable} /></b></div>
+        <div className="tds-calc-row"><span>Output VAT</span><b><Money value={snap.output_vat} /></b></div>
+        <div className="tds-calc-row"><span>Purchase taxable</span><b><Money value={snap.purchase_taxable} /></b></div>
+        <div className="tds-calc-row"><span>Input VAT</span><b><Money value={snap.input_vat} /></b></div>
+        <div className="tds-calc-row tds-calc-total"><span>Net VAT payable</span><b><Money value={snap.net_vat_payable} /></b></div>
         <div className="tds-calc-row" style={{ color: snap.reconciled ? "var(--green2)" : "var(--rust)" }}>
           <span>{snap.reconciled ? "✓ Reconciled with VAT ledger" : "⚠ Not reconciled — resolve before exporting Annex 13"}</span>
         </div>
@@ -237,9 +235,9 @@ function VatReturnDetail({ vatReturn }) {
                 <td style={{ fontSize: 12 }}>{row.document_date}</td>
                 <td style={{ fontSize: 12 }}>{SOURCE_LABELS[row.source_type] || row.source_type} #{row.document_number}</td>
                 <td style={{ fontSize: 12 }}>{row.party_name}</td>
-                <td className="num">{fmt(row.taxable_amount)}</td>
-                <td className="num">{row.output_vat ? fmt(row.output_vat) : "—"}</td>
-                <td className="num">{row.input_vat ? fmt(row.input_vat) : "—"}</td>
+                <td className="num"><Money value={row.taxable_amount} currency="" /></td>
+                <td className="num">{row.output_vat ? <Money value={row.output_vat} currency="" /> : "—"}</td>
+                <td className="num">{row.input_vat ? <Money value={row.input_vat} currency="" /> : "—"}</td>
               </tr>
             ))}
           </tbody>
