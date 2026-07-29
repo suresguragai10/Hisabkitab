@@ -6,6 +6,9 @@ import LifecycleActionModal from "../components/LifecycleActionModal";
 import DocumentActivityModal from "../components/DocumentActivityModal";
 import { useBusinessProfile } from "../lib/businessProfile";
 import { formatMoney } from "../lib/format";
+import PageHeader from "../components/PageHeader";
+import Money from "../components/Money";
+import StatusBadge from "../components/StatusBadge";
 
 const fmt = formatMoney;
 
@@ -169,12 +172,12 @@ function ReturnForm({ noteType, invoices, bills, onSave, onClose, busy, error })
                     <td><input type="checkbox" checked={line.enabled} onChange={(event) => updateLine(index, { enabled: event.target.checked })} /></td>
                     <td>{line.description}</td><td>{line.maxQuantity}</td>
                     <td><input type="number" step="0.001" min="0" max={line.maxQuantity} value={line.quantity} disabled={!line.enabled} onChange={(event) => updateLine(index, { quantity: event.target.value })} style={{ width: 85 }} /></td>
-                    <td>{line.unit}</td><td className="num">{fmt(line.rate)}</td><td className="num">{line.vatRate}%</td><td className="num">{fmt(total)}</td>
+                    <td>{line.unit}</td><td className="num"><Money value={line.rate} currency="" /></td><td className="num">{line.vatRate}%</td><td className="num"><Money value={total} currency="" /></td>
                   </tr>
                 );
               })}
             </tbody>
-            <tfoot><tr><td colSpan={5} /><td className="num"><b>Subtotal {fmt(subtotal)}</b></td><td className="num"><b>VAT {fmt(vat)}</b></td><td className="num"><b>NPR {fmt(subtotal + vat)}</b></td></tr></tfoot>
+            <tfoot><tr><td colSpan={5} /><td className="num"><b>Subtotal <Money value={subtotal} currency="" /></b></td><td className="num"><b>VAT <Money value={vat} currency="" /></b></td><td className="num"><b><Money value={subtotal + vat} /></b></td></tr></tfoot>
           </table>
         </div>
       )}
@@ -253,10 +256,9 @@ export default function CreditDebitNotes() {
   const credit = noteType === "cn";
   return (
     <div className="panel">
-      <div className="panel-head">
-        <h2>Credit &amp; Debit Notes</h2>
+      <PageHeader title="Credit & Debit Notes">
         <button className="btn" onClick={() => setShowForm((current) => !current)}>{showForm ? "Close Editor" : `+ New ${credit ? "Credit" : "Debit"} Note`}</button>
-      </div>
+      </PageHeader>
 
       <div className="filter-tabs" style={{ marginBottom: 16 }}>
         <button className={`filter-tab${credit ? " active" : ""}`} onClick={() => { setNoteType("cn"); setShowForm(false); }}>Credit Notes / Sales Returns</button>
@@ -285,8 +287,8 @@ export default function CreditDebitNotes() {
                     <td><b>{credit ? "CN" : "DN"}-{String(number).padStart(4, "0")}</b></td>
                     <td>{date}</td><td>{credit ? note.party_name : note.vendor_name}</td>
                     <td>{credit ? `Invoice #${note.invoice_number}` : `Bill #${note.bill_number}`}</td>
-                    <td>{note.reason}</td><td className="num"><b>NPR {fmt(note.total)}</b></td>
-                    <td><span className={`status-${note.document_status}`}>{note.document_status}</span></td>
+                    <td>{note.reason}</td><td className="num"><b><Money value={note.total} /></b></td>
+                    <td><StatusBadge status={note.document_status} /></td>
                     <td style={{ whiteSpace: "nowrap" }}>
                       <button className="link" onClick={() => setPrintNote(note)}>Print</button>
                       <button className="link" onClick={() => setActivityNote(note)}>Activity</button>
