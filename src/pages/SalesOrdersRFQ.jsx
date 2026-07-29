@@ -16,12 +16,13 @@ import {
   saveRfqDraft, sendRfq, cancelRfq, convertRfqToBill, deleteDocumentDraft,
 } from "../lib/lifecycle";
 import LifecycleActionModal from "../components/LifecycleActionModal";
+import PageHeader from "../components/PageHeader";
+import Money from "../components/Money";
+import StatusBadge from "../components/StatusBadge";
 import { showToast, confirmDialog } from "../lib/dialogs";
-import { formatMoney } from "../lib/format";
 
 const VAT_RATE = 13;
 const blankLine = () => ({ itemId: "", description: "", quantity: "1", unit: "pcs", rate: "", vatRate: VAT_RATE });
-const fmt = formatMoney;
 function calcAmount(l) { return (parseFloat(l.quantity) || 0) * (parseFloat(l.rate) || 0); }
 function calcVat(l) { return calcAmount(l) * ((parseFloat(l.vatRate) || 0) / 100); }
 
@@ -201,10 +202,9 @@ export default function SalesOrdersRFQ({ docType, lang = "en" }) {
 
   return (
     <div className="panel">
-      <div className="panel-head">
-        <h2>{docLabel}s</h2>
+      <PageHeader title={`${docLabel}s`}>
         <button className="btn" onClick={() => { showForm ? setShowForm(false) : openNew(); }}>{showForm ? "Close Editor" : `+ New ${docLabel}`}</button>
-      </div>
+      </PageHeader>
 
       <div className="settings-info-box" style={{ marginBottom: 16 }}>
         {isSO
@@ -298,8 +298,8 @@ export default function SalesOrdersRFQ({ docType, lang = "en" }) {
                   <td><b>{prefix}-{doc.fiscal_year}-{String(doc[numberField]).padStart(4, "0")}</b></td>
                   <td>{doc[dateField]}</td>
                   <td>{isSO ? doc.party_name : doc.vendor_name}</td>
-                  <td className="num"><b>NPR {fmt(doc.total)}</b></td>
-                  <td><span className={`status-${doc.status}`}>{doc.status}</span></td>
+                  <td className="num"><b><Money value={doc.total} /></b></td>
+                  <td><StatusBadge status={doc.status} /></td>
                   <td style={{ whiteSpace: "nowrap" }}>
                     {doc.status === "draft" && <>
                       <button className="link" onClick={() => openEdit(doc)}>Edit</button>{" · "}
