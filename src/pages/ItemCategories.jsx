@@ -5,6 +5,7 @@
 
 import React, { useEffect, useState } from "react";
 import { listCategories, createCategory, updateCategory } from "../lib/items";
+import PageHeader from "../components/PageHeader";
 
 const BLANK = { name: "", nameNp: "", parentId: "", notes: "" };
 
@@ -74,15 +75,7 @@ export default function ItemCategories({ onChanged }) {
 
   return (
     <div className="panel">
-      <div className="panel-head">
-        <div>
-          <h2>Item Categories</h2>
-          <div className="muted" style={{ fontSize: 13 }}>
-            Group items so you can run &ldquo;sales by category&rdquo; and keep item lists tidy.
-            Optional parent lets you nest (&ldquo;Beverages → Energy Drinks&rdquo;).
-          </div>
-        </div>
-      </div>
+      <PageHeader title="Item Categories" subtitle={<>Group items so you can run &ldquo;sales by category&rdquo; and keep item lists tidy. Optional parent lets you nest (&ldquo;Beverages → Energy Drinks&rdquo;).</>} />
 
       <form onSubmit={save} style={{ display: "grid",
         gridTemplateColumns: "2fr 2fr 2fr 3fr auto",

@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { listAuditLog } from "../lib/db";
+import PageHeader from "../components/PageHeader";
 
 const ACTION_COLOR = {
   create: "#1f6f54",
@@ -24,10 +25,9 @@ export default function AuditLog() {
 
   return (
     <div className="panel">
-      <div className="panel-head">
-        <h2>Audit Log</h2>
+      <PageHeader title="Audit Log">
         <span className="muted" style={{ fontSize: 12 }}>Immutable — records cannot be edited or deleted</span>
-      </div>
+      </PageHeader>
       {err && <p className="msg err">{err}</p>}
       {loading ? <p className="note">Loading…</p> : (
         logs.length === 0 ? (

@@ -4,6 +4,7 @@ import { currentFiscalYear } from "../lib/fiscalYear";
 import { useWorkspace } from "../lib/workspace";
 import { bsToAd, BS_MONTHS_EN } from "../lib/nepaliCalendar";
 import { confirmDialog, promptDialog } from "../lib/dialogs";
+import PageHeader from "../components/PageHeader";
 
 // ── Nepal fiscal year months (Shrawan start) ─────────────────
 // BS month indices (0=Baishakh .. 11=Chaitra) in fiscal-year order:
@@ -134,9 +135,7 @@ export default function Settings() {
 
   return (
     <div className="panel">
-      <div className="panel-head">
-        <h2>Settings (सेटिङ्ग)</h2>
-      </div>
+      <PageHeader title="Settings (सेटिङ्ग)" />
 
       {/* Section tabs */}
       <div className="filter-tabs" style={{marginBottom:20}}>

@@ -3,6 +3,7 @@ import BsDateInput from "../components/BsDateInput";
 import { fiscalYearFor } from "../lib/fiscalYear";
 import { todayLocalDate } from "../lib/nepaliCalendar";
 import { confirmDialog } from "../lib/dialogs";
+import Money from "../components/Money";
 import {
   createStructuredAccount,
   deactivateStructuredAccount,
@@ -194,9 +195,9 @@ function OpeningJournal({ accounts, legacy, journals, onClose, onPosted }) {
 
         {legacy.count > 0 && (
           <div className="msg" style={{ marginBottom: 14 }}>
-            <b>Legacy opening balances found:</b> {legacy.count} account(s), Dr NPR {legacy.debit.toLocaleString()} / Cr NPR {legacy.credit.toLocaleString()}.
+            <b>Legacy opening balances found:</b> {legacy.count} account(s), Dr <Money value={legacy.debit} /> / Cr <Money value={legacy.credit} />.
             {Math.abs(legacy.debit - legacy.credit) > 0.005 && (
-              <label className="fld" style={{ marginTop: 10 }}>Offset account required for NPR {Math.abs(legacy.debit - legacy.credit).toLocaleString()}
+              <label className="fld" style={{ marginTop: 10 }}>Offset account required for <Money value={Math.abs(legacy.debit - legacy.credit)} />
                 <select value={offsetAccountId} onChange={(e) => setOffsetAccountId(e.target.value)}>
                   <option value="">Select offset account</option>
                   {balanceAccounts.map((account) => <option key={account.id} value={account.id}>{account.account_code} · {account.name}</option>)}
@@ -226,8 +227,8 @@ function OpeningJournal({ accounts, legacy, journals, onClose, onPosted }) {
         </div>
         <button className="ghost-btn" type="button" onClick={() => setLines((current) => [...current, blankOpeningLine()])}>+ Add line</button>
         <div className={`net-result ${Math.abs(totals.debit - totals.credit) <= 0.005 && totals.debit > 0 ? "profit" : "loss"}`} style={{ marginTop: 12 }}>
-          <span>Debit NPR {totals.debit.toLocaleString()} · Credit NPR {totals.credit.toLocaleString()}</span>
-          <span>Difference NPR {Math.abs(totals.debit - totals.credit).toLocaleString()}</span>
+          <span>Debit <Money value={totals.debit} /> · Credit <Money value={totals.credit} /></span>
+          <span>Difference <Money value={Math.abs(totals.debit - totals.credit)} /></span>
         </div>
         {journals.length > 0 && <p className="note">Existing opening journal: {journals[0].fiscal_year} on {journals[0].opening_date}</p>}
         {error && <p className="msg err">{error}</p>}
