@@ -14,6 +14,8 @@ import {
 import { listContacts } from "../lib/contacts";
 import { confirmDialog } from "../lib/dialogs";
 import { formatMoney } from "../lib/format";
+import PageHeader from "../components/PageHeader";
+import Money from "../components/Money";
 
 const ITEM_TYPES = [
   { key: "goods",         label: "Goods (tracked in inventory)" },
@@ -24,6 +26,7 @@ const ITEM_TYPES = [
 const UNITS = ["pcs", "kg", "gm", "ltr", "ml", "box", "ctn", "pack", "dozen", "meter", "sqft"];
 
 const fmt = (n) => formatMoney(n, { locale: "en-IN", minimumFractionDigits: 0 });
+const moneyOpts = { locale: "en-IN", minimumFractionDigits: 0 };
 
 const BLANK = {
   name: "", nameNp: "", sku: "", hsnCode: "", brand: "",
@@ -71,10 +74,9 @@ function ItemFormModal({ initial, categories, vendors, onSave, onCancel, onNewCa
     <div className="modal-overlay" onClick={onCancel}>
       <div className="modal" onClick={(e) => e.stopPropagation()}
            style={{ maxWidth: 800, width: "94%", maxHeight: "92vh", overflowY: "auto" }}>
-        <div className="panel-head">
-          <h3>{initial?.id ? "Edit Item" : "New Item"}</h3>
+        <PageHeader title={initial?.id ? "Edit Item" : "New Item"} as="h3">
           <button className="link" onClick={onCancel}>✕</button>
-        </div>
+        </PageHeader>
 
         <form onSubmit={submit} style={{ display: "grid", gap: 12, padding: 16 }}>
 
@@ -217,7 +219,7 @@ function QuickCategoryModal({ onSave, onCancel, busy }) {
   return (
     <div className="modal-overlay" onClick={onCancel}>
       <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 460, width: "94%" }}>
-        <div className="panel-head"><h3>New Category</h3><button className="link" onClick={onCancel}>✕</button></div>
+        <PageHeader title="New Category" as="h3"><button className="link" onClick={onCancel}>✕</button></PageHeader>
         <form onSubmit={submit} style={{ padding: 16, display: "grid", gap: 10 }}>
           <label className="fld">Name *<input required autoFocus value={name} onChange={(e) => setName(e.target.value)} /></label>
           <label className="fld">Devanagari<input value={nameNp} lang="ne" onChange={(e) => setNameNp(e.target.value)} /></label>
@@ -322,16 +324,9 @@ export default function Items({ onChanged }) {
 
   return (
     <div className="panel">
-      <div className="panel-head">
-        <div>
-          <h2>Items</h2>
-          <div className="muted" style={{ fontSize: 13 }}>
-            The item master. Feeds invoice lines and bill lines with smart defaults —
-            enter the price, VAT, HSN once and every future document uses it.
-          </div>
-        </div>
+      <PageHeader title="Items" subtitle="The item master. Feeds invoice lines and bill lines with smart defaults — enter the price, VAT, HSN once and every future document uses it.">
         <button className="btn" onClick={() => { setEditing(null); setShowForm(true); }}>+ New Item</button>
-      </div>
+      </PageHeader>
 
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", padding: "10px 16px",
                     alignItems: "center", borderBottom: "1px solid #eee" }}>
@@ -351,7 +346,7 @@ export default function Items({ onChanged }) {
           Include inactive
         </label>
         <div style={{ marginLeft: "auto", fontSize: 13 }} className="muted">
-          {rows.length} items · Stock value NPR {fmt(totalStockValue)}
+          {rows.length} items · Stock value <Money value={totalStockValue} options={moneyOpts} />
         </div>
       </div>
 
@@ -397,8 +392,8 @@ export default function Items({ onChanged }) {
                    r.track_inventory ? "Goods (tracked)" : "Goods (untracked)"}
                 </td>
                 <td className="num">
-                  <div>NPR {fmt(r.sales_price)} <span className="muted" style={{ fontSize: 11 }}>+{r.sales_tax_rate}%</span></div>
-                  <div className="muted" style={{ fontSize: 12 }}>Avg. cost NPR {fmt(r.average_cost ?? r.purchase_price)}</div>
+                  <div><Money value={r.sales_price} options={moneyOpts} /> <span className="muted" style={{ fontSize: 11 }}>+{r.sales_tax_rate}%</span></div>
+                  <div className="muted" style={{ fontSize: 12 }}>Avg. cost <Money value={r.average_cost ?? r.purchase_price} options={moneyOpts} /></div>
                 </td>
                 <td className="num">
                   {r.track_inventory ? (

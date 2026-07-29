@@ -4,10 +4,8 @@ import { downloadCsv, getGeneralLedgerReport, getReportFiscalYears } from "../li
 import { todayLocalDate, toLocalDateString } from "../lib/nepaliCalendar";
 import { useBusinessProfile } from "../lib/businessProfile";
 import ReportLetterhead from "../components/ReportLetterhead";
-import { formatMoney } from "../lib/format";
-
-const money = formatMoney;
-const balance = (value) => `${money(Math.abs(Number(value || 0)))} ${Number(value || 0) >= 0 ? "Dr" : "Cr"}`;
+import PageHeader from "../components/PageHeader";
+import Money from "../components/Money";
 const today = () => todayLocalDate();
 const defaultFrom = () => {
   const date = new Date();
@@ -73,7 +71,7 @@ export default function Ledger() {
 
   return (
     <div className="panel">
-      <div className="panel-head"><h2>General Ledger</h2></div>
+      <PageHeader title="General Ledger" />
       <div style={{ display: "flex", gap: 12, alignItems: "end", flexWrap: "wrap", marginBottom: 16 }}>
         <label className="fld" style={{ margin: 0, minWidth: 250, flex: "1 1 280px" }}>Account
           <select value={accountId} onChange={(event) => setAccountId(event.target.value)}>
@@ -103,19 +101,19 @@ export default function Ledger() {
       {ledger && !loading && <>
         <ReportLetterhead profile={profile} />
         <div className="stat-row">
-          <div className="stat"><small>Opening</small><span>{balance(ledger.opening_balance)}</span></div>
-          <div className="stat"><small>Period debit</small><span>{money(ledger.period_debit)}</span></div>
-          <div className="stat"><small>Period credit</small><span>{money(ledger.period_credit)}</span></div>
-          <div className="stat"><small>Closing</small><span>{balance(ledger.closing_balance)}</span></div>
+          <div className="stat"><small>Opening</small><span><Money value={ledger.opening_balance} negativeStyle="dr-cr" currency="" /></span></div>
+          <div className="stat"><small>Period debit</small><span><Money value={ledger.period_debit} currency="" /></span></div>
+          <div className="stat"><small>Period credit</small><span><Money value={ledger.period_credit} currency="" /></span></div>
+          <div className="stat"><small>Closing</small><span><Money value={ledger.closing_balance} negativeStyle="dr-cr" currency="" /></span></div>
         </div>
         <div style={{ overflowX: "auto" }}><table className="tbl">
           <thead><tr><th>Date</th><th>Voucher</th><th>Description</th><th className="num">Debit</th><th className="num">Credit</th><th className="num">Balance</th></tr></thead>
           <tbody>
-            <tr><td>{fromDate}</td><td>Opening</td><td>Balance brought forward</td><td /><td /><td className="num">{balance(ledger.opening_balance)}</td></tr>
+            <tr><td>{fromDate}</td><td>Opening</td><td>Balance brought forward</td><td /><td /><td className="num"><Money value={ledger.opening_balance} negativeStyle="dr-cr" currency="" /></td></tr>
             {(ledger.rows || []).map((row) => <tr key={row.id}>
               <td>{row.date}</td><td>{row.voucher_type} #{row.voucher_number}</td><td>{row.description || row.narration || "—"}</td>
-              <td className="num">{Number(row.debit) ? money(row.debit) : ""}</td><td className="num">{Number(row.credit) ? money(row.credit) : ""}</td>
-              <td className="num">{balance(row.running_balance)}</td>
+              <td className="num">{Number(row.debit) ? <Money value={row.debit} currency="" /> : ""}</td><td className="num">{Number(row.credit) ? <Money value={row.credit} currency="" /> : ""}</td>
+              <td className="num"><Money value={row.running_balance} negativeStyle="dr-cr" currency="" /></td>
             </tr>)}
           </tbody>
         </table></div>
