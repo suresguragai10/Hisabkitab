@@ -8,6 +8,9 @@ import { createBillWithPosting, refreshDocumentPaymentStatuses } from "../lib/po
 import { cancelBillDocument, deleteDocumentDraft, postBillDraft, saveBillDraft } from "../lib/lifecycle";
 import LifecycleActionModal from "../components/LifecycleActionModal";
 import DocumentActivityModal from "../components/DocumentActivityModal";
+import PageHeader from "../components/PageHeader";
+import Money from "../components/Money";
+import StatusBadge from "../components/StatusBadge";
 import PaymentModal from "./PaymentModal";
 import { useBusinessProfile } from "../lib/businessProfile";
 
@@ -327,18 +330,17 @@ export default function Purchases() {
 
   return (
     <div className="panel">
-      <div className="panel-head">
-        <h2>Purchases (खरिद)</h2>
+      <PageHeader title="Purchases (खरिद)">
         <button className="btn" onClick={() => {
           if (showForm) resetEditor();
           setShowForm((current) => !current);
         }}>{showForm ? "Close Editor" : "+ New Bill"}</button>
-      </div>
+      </PageHeader>
 
       <div className="stat-row">
-        <div className="stat"><span style={{ color: "var(--rust)" }}>NPR {totalOutstanding.toLocaleString()}</span>Outstanding Bills</div>
-        <div className="stat"><span>NPR {totalPaid.toLocaleString()}</span>Paid Bills</div>
-        <div className="stat"><span>NPR {totalVat.toLocaleString()}</span>Input VAT</div>
+        <div className="stat"><span style={{ color: "var(--rust)" }}><Money value={totalOutstanding} /></span>Outstanding Bills</div>
+        <div className="stat"><span><Money value={totalPaid} /></span>Paid Bills</div>
+        <div className="stat"><span><Money value={totalVat} /></span>Input VAT</div>
         <div className="stat"><span>{bills.length}</span>Total Bills</div>
       </div>
 
@@ -433,11 +435,11 @@ export default function Purchases() {
                     </td>
                     <td>{bill.bill_date}</td>
                     <td>{bill.vendor_name}</td>
-                    <td><span className={`status-${lifecycle}`}>{lifecycle}</span></td>
-                    <td>{lifecycle === "posted" ? <span className={`status-${bill.status}`}>{bill.status}</span> : "—"}</td>
-                    <td className="num">NPR {Number(bill.amount_paid || 0).toLocaleString()}</td>
-                    <td className="num"><b>NPR {Number(bill.outstanding_amount || 0).toLocaleString()}</b></td>
-                    <td className="num"><b>NPR {Number(bill.net_total ?? bill.total).toLocaleString()}</b>{Number(bill.credited_amount || 0) > 0 && <div className="muted" style={{ fontSize: 10 }}>Original {Number(bill.total).toLocaleString()}</div>}</td>
+                    <td><StatusBadge status={lifecycle} /></td>
+                    <td>{lifecycle === "posted" ? <StatusBadge status={bill.status} /> : "—"}</td>
+                    <td className="num"><Money value={bill.amount_paid || 0} /></td>
+                    <td className="num"><b><Money value={bill.outstanding_amount || 0} /></b></td>
+                    <td className="num"><b><Money value={bill.net_total ?? bill.total} /></b>{Number(bill.credited_amount || 0) > 0 && <div className="muted" style={{ fontSize: 10 }}>Original <Money value={bill.total} /></div>}</td>
                     <td style={{ whiteSpace: "nowrap" }}>
                       {lifecycle !== "draft" && <button className="link" onClick={() => setPrintBill(bill)}>View</button>}
                       <button className="link" onClick={() => setActivityDoc(bill)}>Activity</button>
