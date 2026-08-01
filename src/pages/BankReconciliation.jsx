@@ -437,7 +437,9 @@ export default function BankReconciliation() {
                   {lines.map(l=>(
                     <div key={l.id}
                       className={"recon-card" + (l.is_matched?" recon-matched":"") + (selectedLine===l.id?" recon-selected":"")}
-                      onClick={()=>!l.is_matched && setSelectedLine(selectedLine===l.id?null:l.id)}>
+                      role="button" tabIndex={l.is_matched ? -1 : 0} aria-disabled={l.is_matched} aria-pressed={selectedLine===l.id}
+                      onClick={()=>!l.is_matched && setSelectedLine(selectedLine===l.id?null:l.id)}
+                      onKeyDown={(e)=>{ if (!l.is_matched && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); setSelectedLine(selectedLine===l.id?null:l.id); } }}>
                       <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
                         <div>
                           <div style={{fontSize:12,fontWeight:600}}>{l.description}</div>
@@ -476,7 +478,9 @@ export default function BankReconciliation() {
                   {unmatchedVouchers.map(v=>(
                     <div key={v.id}
                       className={"recon-card recon-voucher" + (selectedLine?" recon-matchable":"")}
-                      onClick={()=>selectedLine && matchLine(selectedLine, v.vouchers?.id)}>
+                      role="button" tabIndex={selectedLine ? 0 : -1} aria-disabled={!selectedLine}
+                      onClick={()=>selectedLine && matchLine(selectedLine, v.vouchers?.id)}
+                      onKeyDown={(e)=>{ if (selectedLine && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); matchLine(selectedLine, v.vouchers?.id); } }}>
                       <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
                         <div>
                           <div style={{fontSize:12,fontWeight:600}}>

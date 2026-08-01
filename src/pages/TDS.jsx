@@ -403,7 +403,7 @@ export default function TDS({ userId }) {
                 {allByView.map(e=>(
                   <tr key={e.id}>
                     {showRemit && view==="pending" && (
-                      <td><input type="checkbox" checked={selected.has(e.id)} onChange={()=>toggleSelect(e.id)} /></td>
+                      <td><input type="checkbox" checked={selected.has(e.id)} onChange={()=>toggleSelect(e.id)} aria-label={`Select ${e.payee_name} for remittance`} /></td>
                     )}
                     <td style={{fontSize:12}}>{e.entry_date}</td>
                     <td><span className="tag">{TDS_TYPES.find(t=>t.type===e.tds_type)?.label||e.tds_type}</span></td>

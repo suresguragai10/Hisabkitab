@@ -169,7 +169,7 @@ function ReturnForm({ noteType, invoices, bills, onSave, onClose, busy, error })
                 const total = quantity * line.rate * (1 + line.vatRate / 100);
                 return (
                   <tr key={line.sourceLineId}>
-                    <td><input type="checkbox" checked={line.enabled} onChange={(event) => updateLine(index, { enabled: event.target.checked })} /></td>
+                    <td><input type="checkbox" checked={line.enabled} onChange={(event) => updateLine(index, { enabled: event.target.checked })} aria-label={`Return ${line.description || "this line"}`} /></td>
                     <td>{line.description}</td><td>{line.maxQuantity}</td>
                     <td><input type="number" step="0.001" min="0" max={line.maxQuantity} value={line.quantity} disabled={!line.enabled} onChange={(event) => updateLine(index, { quantity: event.target.value })} style={{ width: 85 }} /></td>
                     <td>{line.unit}</td><td className="num"><Money value={line.rate} currency="" /></td><td className="num">{line.vatRate}%</td><td className="num"><Money value={total} currency="" /></td>

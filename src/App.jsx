@@ -538,7 +538,8 @@ function Authed({ session, lang, toggleLang }) {
       <Style />
 
       {/* Mobile menu toggle */}
-      <button className="sidebar-toggle no-print" onClick={()=>setSidebarOpen(s=>!s)}>
+      <button className="sidebar-toggle no-print" onClick={()=>setSidebarOpen(s=>!s)}
+        aria-label={sidebarOpen ? "Close menu" : "Open menu"} aria-expanded={sidebarOpen}>
         {sidebarOpen ? <X size={20} /> : <Menu size={20} />}
       </button>
 

@@ -99,7 +99,7 @@ function ContactFormModal({ initial, onSave, onCancel, busy, err }) {
       <div className="modal" onClick={(e) => e.stopPropagation()}
            style={{ maxWidth: 720, width: "94%", maxHeight: "90vh", overflowY: "auto" }}>
         <PageHeader title={initial?.id ? "Edit Contact" : "New Contact"} as="h3">
-          <button className="link" onClick={onCancel}>✕</button>
+          <button className="link" onClick={onCancel} aria-label="Close">✕</button>
         </PageHeader>
 
         <form onSubmit={submit} style={{ display: "grid", gap: 12, padding: 16 }}>
@@ -317,6 +317,7 @@ export default function Contacts({ userId, onChanged, onViewStatement }) {
         <input
           className="fld-inline"
           placeholder="Search name, phone, email, PAN…"
+          aria-label="Search contacts"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           style={{ marginLeft: "auto", padding: "6px 10px", minWidth: 240 }} />

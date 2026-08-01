@@ -186,7 +186,7 @@ function OpeningJournal({ accounts, legacy, journals, onClose, onPosted }) {
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal-card" style={{ maxWidth: 920 }} onClick={(e) => e.stopPropagation()}>
-        <div className="modal-head"><h3>Opening Journal</h3><button className="link" onClick={onClose}>✕</button></div>
+        <div className="modal-head"><h3>Opening Journal</h3><button className="link" onClick={onClose} aria-label="Close">✕</button></div>
         <div className="grid-form">
           <label className="fld">Opening date<BsDateInput value={date} onChange={updateDate} /></label>
           <label className="fld">Fiscal year<input value={fiscalYear} onChange={(e) => setFiscalYear(e.target.value)} /></label>

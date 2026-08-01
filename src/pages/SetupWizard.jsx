@@ -42,7 +42,9 @@ function Step1({ value, onChange, onNext }) {
         {BIZ_TYPES.map(t => (
           <div key={t.type}
             className={"wizard-type-card" + (value===t.type?" selected":"")}
-            onClick={() => onChange(t.type)}>
+            role="button" tabIndex={0} aria-pressed={value===t.type}
+            onClick={() => onChange(t.type)}
+            onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onChange(t.type); } }}>
             <div className="wizard-type-icon">{t.icon}</div>
             <div className="wizard-type-label">{t.label}</div>
             <div className="wizard-type-desc">{t.desc}</div>

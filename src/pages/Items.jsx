@@ -75,7 +75,7 @@ function ItemFormModal({ initial, categories, vendors, onSave, onCancel, onNewCa
       <div className="modal" onClick={(e) => e.stopPropagation()}
            style={{ maxWidth: 800, width: "94%", maxHeight: "92vh", overflowY: "auto" }}>
         <PageHeader title={initial?.id ? "Edit Item" : "New Item"} as="h3">
-          <button className="link" onClick={onCancel}>✕</button>
+          <button className="link" onClick={onCancel} aria-label="Close">✕</button>
         </PageHeader>
 
         <form onSubmit={submit} style={{ display: "grid", gap: 12, padding: 16 }}>
@@ -219,7 +219,7 @@ function QuickCategoryModal({ onSave, onCancel, busy }) {
   return (
     <div className="modal-overlay" onClick={onCancel}>
       <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 460, width: "94%" }}>
-        <PageHeader title="New Category" as="h3"><button className="link" onClick={onCancel}>✕</button></PageHeader>
+        <PageHeader title="New Category" as="h3"><button className="link" onClick={onCancel} aria-label="Close">✕</button></PageHeader>
         <form onSubmit={submit} style={{ padding: 16, display: "grid", gap: 10 }}>
           <label className="fld">Name *<input required autoFocus value={name} onChange={(e) => setName(e.target.value)} /></label>
           <label className="fld">Devanagari<input value={nameNp} lang="ne" onChange={(e) => setNameNp(e.target.value)} /></label>
@@ -330,7 +330,7 @@ export default function Items({ onChanged }) {
 
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", padding: "10px 16px",
                     alignItems: "center", borderBottom: "1px solid #eee" }}>
-        <input placeholder="Search name, SKU, HSN, brand…" value={search}
+        <input placeholder="Search name, SKU, HSN, brand…" aria-label="Search items" value={search}
                onChange={(e) => setSearch(e.target.value)}
                style={{ padding: "6px 10px", minWidth: 240 }} />
         <select value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)}>
