@@ -110,6 +110,37 @@ export const translations = {
   required:         { en: "This field is required.", np: "यो फिल्ड आवश्यक छ।" },
   notBalanced:      { en: "Debit and credit must be equal.", np: "डेबिट र क्रेडिट बराबर हुनुपर्छ।" },
   tooManyAttempts:  { en: "Too many attempts. Wait 15 minutes.", np: "धेरै प्रयास भयो। १५ मिनेट पर्खनुस्।" },
+
+  // Dashboard (audit 4.8 -- not certified-translator reviewed, standard
+  // low-ambiguity business vocabulary, worth a native-speaker check same
+  // as the print-document translations)
+  refresh:            { en: "Refresh",               np: "पुनः लोड" },
+  cashPosition:       { en: "Cash Position",          np: "नगद स्थिति" },
+  salesAndTax:        { en: "Sales & Tax",            np: "बिक्री र कर" },
+  payablesCompliance: { en: "Payables & Compliance",  np: "भुक्तानी र अनुपालन" },
+  quickActions:       { en: "Quick Actions",          np: "द्रुत कार्यहरू" },
+  cashAndBank:        { en: "Cash & Bank",             np: "नगद र बैंक" },
+  receivables:        { en: "Receivables",             np: "प्राप्त गर्नुपर्ने रकम" },
+  payables:           { en: "Payables",                np: "तिर्नुपर्ने रकम" },
+  overdueInvoices:    { en: "Overdue Invoices",        np: "म्याद नाघेका बिजक" },
+  salesThisMonth:     { en: "Sales This Month",        np: "यस महिनाको बिक्री" },
+  salesLastMonth:     { en: "Sales Last Month",        np: "गत महिनाको बिक्री" },
+  vatThisMonth:       { en: "VAT This Month",          np: "यस महिनाको भ्याट" },
+  stockValue:         { en: "Stock Value",             np: "स्टक मूल्य" },
+  grossMargin:        { en: "Gross Margin",            np: "कुल नाफा मार्जिन" },
+  billsDueSoon:       { en: "Bills Due Soon",          np: "छिट्टै तिर्नुपर्ने बिल" },
+  billsOverdue:       { en: "Bills Overdue",           np: "म्याद नाघेका बिल" },
+  tdsPending:         { en: "TDS Pending",             np: "बाँकी टिडिएस" },
+  bankUnreconciled:   { en: "Bank Unreconciled",       np: "बैंक मिलान नभएको" },
+  negativeStock:      { en: "Negative Stock",          np: "ऋणात्मक स्टक" },
+  topOverdueCustomers:{ en: "Top Overdue Customers",   np: "बढी बाँकी भएका ग्राहक" },
+  recentInvoices:     { en: "Recent Invoices",         np: "हालका बिजक" },
+  recentVouchers:     { en: "Recent Vouchers",         np: "हालका भाउचर" },
+  newInvoiceCta:      { en: "+ New Invoice",           np: "+ नयाँ बिजक" },
+  newPurchaseCta:     { en: "+ New Purchase",          np: "+ नयाँ खरिद" },
+  newVoucherCta:      { en: "+ New Voucher",           np: "+ नयाँ भाउचर" },
+  stockEntryCta:      { en: "+ Stock Entry",           np: "+ स्टक प्रविष्टि" },
+  overdue:            { en: "Overdue",                 np: "म्याद नाघेको" },
 };
 
 // Translate a key

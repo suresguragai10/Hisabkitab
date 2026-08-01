@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { supabase } from "../supabase";
 import { formatMoney } from "../lib/format";
+import { t } from "../lib/i18n";
 import PageHeader from "../components/PageHeader";
 import Money from "../components/Money";
 import StatusBadge from "../components/StatusBadge";
@@ -37,7 +38,7 @@ async function fetchRecentActivity() {
   };
 }
 
-export default function Dashboard({ refreshKey, onNav }) {
+export default function Dashboard({ refreshKey, onNav, lang = "en" }) {
   const [stats, setStats]    = useState(null);
   const [activity, setActivity] = useState(null);
   const [err, setErr]        = useState(null);
@@ -76,7 +77,7 @@ export default function Dashboard({ refreshKey, onNav }) {
   return (
     <div className="panel">
       <PageHeader title="Dashboard (ड्यासबोर्ड)">
-        <button className="ghost-btn" onClick={load}>↻ Refresh</button>
+        <button className="ghost-btn" onClick={load}>↻ {t("refresh", lang)}</button>
       </PageHeader>
 
       {err && <p className="msg err">{err}</p>}
@@ -86,24 +87,24 @@ export default function Dashboard({ refreshKey, onNav }) {
       ) : !stats ? null : (
         <>
           {/* ── Row 1: Cash position ── */}
-          <div className="dash-section-title">Cash Position</div>
+          <div className="dash-section-title">{t("cashPosition", lang)}</div>
           <div className="dash-cards">
             <DashCard
-              label="Cash & Bank"
+              label={t("cashAndBank", lang)}
               value={"NPR " + fmtK(stats.cash)}
               sub="Available balance"
               color="green"
               icon={Wallet}
             />
             <DashCard
-              label="Receivables"
+              label={t("receivables", lang)}
               value={"NPR " + fmtK(stats.receivables)}
               sub="Customers owe you"
               color={stats.receivables > 0 ? "gold" : "neutral"}
               icon={ArrowDownToLine}
             />
             <DashCard
-              label="Payables"
+              label={t("payables", lang)}
               value={"NPR " + fmtK(stats.payables)}
               sub="You owe vendors"
               color={stats.payables > 0 ? "rust" : "neutral"}
@@ -111,7 +112,7 @@ export default function Dashboard({ refreshKey, onNav }) {
             />
             {stats.overdue_count > 0 && (
               <DashCard
-                label="Overdue Invoices"
+                label={t("overdueInvoices", lang)}
                 value={stats.overdue_count}
                 sub={stats.overdue_amount != null ? `NPR ${fmtK(stats.overdue_amount)} past due` : "Past due date"}
                 color="rust"
@@ -121,10 +122,10 @@ export default function Dashboard({ refreshKey, onNav }) {
           </div>
 
           {/* ── Row 2: Sales & VAT ── */}
-          <div className="dash-section-title" style={{marginTop:20}}>Sales & Tax</div>
+          <div className="dash-section-title" style={{marginTop:20}}>{t("salesAndTax", lang)}</div>
           <div className="dash-cards">
             <DashCard
-              label="Sales This Month"
+              label={t("salesThisMonth", lang)}
               value={"NPR " + fmtK(stats.sales_this)}
               sub={salesTrend !== null
                 ? (salesTrend >= 0 ? "▲ " : "▼ ") + Math.abs(salesTrend) + "% vs last month"
@@ -133,14 +134,14 @@ export default function Dashboard({ refreshKey, onNav }) {
               icon={TrendingUp}
             />
             <DashCard
-              label="Sales Last Month"
+              label={t("salesLastMonth", lang)}
               value={"NPR " + fmtK(stats.sales_last)}
               sub="Previous month"
               color="neutral"
               icon={BarChart3}
             />
             <DashCard
-              label="VAT This Month"
+              label={t("vatThisMonth", lang)}
               value={"NPR " + fmtK(stats.vat_payable)}
               sub={daysToVat !== null
                 ? (daysToVat > 0 ? `Due in ${daysToVat} days (${vatDeadline})` : `Overdue! Due ${vatDeadline}`)
@@ -149,7 +150,7 @@ export default function Dashboard({ refreshKey, onNav }) {
               icon={ScrollText}
             />
             <DashCard
-              label="Stock Value"
+              label={t("stockValue", lang)}
               value={"NPR " + fmtK(stats.stock_value)}
               sub={stats.low_stock > 0 ? `⚠ ${stats.low_stock} item(s) low on stock` : "All stock levels OK"}
               color={stats.low_stock > 0 ? "gold" : "neutral"}
@@ -157,7 +158,7 @@ export default function Dashboard({ refreshKey, onNav }) {
             />
             {stats.gross_margin_pct != null && (
               <DashCard
-                label="Gross Margin"
+                label={t("grossMargin", lang)}
                 value={stats.gross_margin_pct + "%"}
                 sub="This month, sales vs. COGS"
                 color={stats.gross_margin_pct >= 20 ? "green" : stats.gross_margin_pct >= 0 ? "gold" : "rust"}
@@ -167,11 +168,11 @@ export default function Dashboard({ refreshKey, onNav }) {
           </div>
 
           {/* ── Row 3: Payables & compliance ── */}
-          {hasComplianceAlerts && <div className="dash-section-title" style={{marginTop:20}}>Payables & Compliance</div>}
+          {hasComplianceAlerts && <div className="dash-section-title" style={{marginTop:20}}>{t("payablesCompliance", lang)}</div>}
           {hasComplianceAlerts && <div className="dash-cards">
             {stats.bills_due_soon_count > 0 && (
               <DashCard
-                label="Bills Due Soon"
+                label={t("billsDueSoon", lang)}
                 value={stats.bills_due_soon_count}
                 sub={`NPR ${fmtK(stats.bills_due_soon_amount)} due within 7 days`}
                 color="gold"
@@ -180,7 +181,7 @@ export default function Dashboard({ refreshKey, onNav }) {
             )}
             {stats.bills_overdue_count > 0 && (
               <DashCard
-                label="Bills Overdue"
+                label={t("billsOverdue", lang)}
                 value={stats.bills_overdue_count}
                 sub={`NPR ${fmtK(stats.bills_overdue_amount)} past due`}
                 color="rust"
@@ -189,7 +190,7 @@ export default function Dashboard({ refreshKey, onNav }) {
             )}
             {stats.tds_pending > 0.005 && (
               <DashCard
-                label="TDS Pending"
+                label={t("tdsPending", lang)}
                 value={"NPR " + fmtK(stats.tds_pending)}
                 sub="Deducted, not yet remitted"
                 color="gold"
@@ -198,7 +199,7 @@ export default function Dashboard({ refreshKey, onNav }) {
             )}
             {stats.bank_unreconciled > 0 && (
               <DashCard
-                label="Bank Unreconciled"
+                label={t("bankUnreconciled", lang)}
                 value={stats.bank_unreconciled}
                 sub="Statement line(s) awaiting match"
                 color="gold"
@@ -207,7 +208,7 @@ export default function Dashboard({ refreshKey, onNav }) {
             )}
             {stats.negative_stock_count > 0 && (
               <DashCard
-                label="Negative Stock"
+                label={t("negativeStock", lang)}
                 value={stats.negative_stock_count}
                 sub="Item(s) below zero — needs a look"
                 color="rust"
@@ -217,13 +218,13 @@ export default function Dashboard({ refreshKey, onNav }) {
           </div>}
 
           {/* ── Quick actions ── */}
-          <div className="dash-section-title" style={{marginTop:20}}>Quick Actions</div>
+          <div className="dash-section-title" style={{marginTop:20}}>{t("quickActions", lang)}</div>
           <div className="dash-actions">
             {onNav && <>
-              <button className="btn" onClick={()=>onNav("invoices")}>+ New Invoice</button>
-              <button className="ghost-btn" onClick={()=>onNav("purchases")}>+ New Purchase</button>
-              <button className="ghost-btn" onClick={()=>onNav("vouchers")}>+ New Voucher</button>
-              <button className="ghost-btn" onClick={()=>onNav("inventory")}>+ Stock Entry</button>
+              <button className="btn" onClick={()=>onNav("invoices")}>{t("newInvoiceCta", lang)}</button>
+              <button className="ghost-btn" onClick={()=>onNav("purchases")}>{t("newPurchaseCta", lang)}</button>
+              <button className="ghost-btn" onClick={()=>onNav("vouchers")}>{t("newVoucherCta", lang)}</button>
+              <button className="ghost-btn" onClick={()=>onNav("inventory")}>{t("stockEntryCta", lang)}</button>
             </>}
           </div>
 
@@ -232,10 +233,10 @@ export default function Dashboard({ refreshKey, onNav }) {
             {/* Top overdue customers */}
             {stats.top_overdue_customers?.length > 0 && (
               <div>
-                <div className="dash-section-title">Top Overdue Customers</div>
+                <div className="dash-section-title">{t("topOverdueCustomers", lang)}</div>
                 <div className="table-scroll">
                 <table className="tbl">
-                  <thead><tr><th>Customer</th><th className="num">Overdue</th></tr></thead>
+                  <thead><tr><th>{t("customer", lang)}</th><th className="num">{t("overdue", lang)}</th></tr></thead>
                   <tbody>
                     {stats.top_overdue_customers.map((c,idx)=>(
                       <tr key={idx}>
@@ -251,13 +252,13 @@ export default function Dashboard({ refreshKey, onNav }) {
 
             {/* Recent invoices */}
             <div>
-              <div className="dash-section-title">Recent Invoices</div>
+              <div className="dash-section-title">{t("recentInvoices", lang)}</div>
               {!activity?.invoices?.length ? (
                 <p className="note">No invoices yet.</p>
               ) : (
                 <div className="table-scroll">
                 <table className="tbl">
-                  <thead><tr><th>Invoice #</th><th>Customer</th><th className="num">Amount</th><th>Status</th></tr></thead>
+                  <thead><tr><th>Invoice #</th><th>{t("customer", lang)}</th><th className="num">{t("amount", lang)}</th><th>{t("status", lang)}</th></tr></thead>
                   <tbody>
                     {activity.invoices.map(i=>(
                       <tr key={i.id}>
@@ -275,13 +276,13 @@ export default function Dashboard({ refreshKey, onNav }) {
 
             {/* Recent vouchers */}
             <div>
-              <div className="dash-section-title">Recent Vouchers</div>
+              <div className="dash-section-title">{t("recentVouchers", lang)}</div>
               {!activity?.vouchers?.length ? (
                 <p className="note">No vouchers yet.</p>
               ) : (
                 <div className="table-scroll">
                 <table className="tbl">
-                  <thead><tr><th>Date</th><th>Type</th><th>Narration</th></tr></thead>
+                  <thead><tr><th>{t("date", lang)}</th><th>Type</th><th>{t("narration", lang)}</th></tr></thead>
                   <tbody>
                     {activity.vouchers.map(v=>(
                       <tr key={v.id}>
