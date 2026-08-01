@@ -4,6 +4,12 @@ import { supabase, diagnoseAuthServer } from "./supabase";
 import { seedDefaultAccountsIfNeeded, checkRateLimit, logRateLimit, listAuditLog } from "./lib/db";
 import { getLang, setLang, t } from "./lib/i18n";
 import { formatBs } from "./lib/nepaliCalendar";
+import {
+  Home, FileText, Receipt, Undo2, FileQuestion, ShoppingCart, Users, Tag,
+  FolderTree, Package, Landmark, NotebookPen, BookOpen, Library, BarChart3,
+  ScrollText, Percent, UserCog, Settings as SettingsIcon, ShieldCheck,
+  ClipboardList, Menu, X,
+} from "lucide-react";
 
 // ── Global tab error boundary — shows the real error instead of a
 //    blank page when any single tab/page crashes. Key it by `tab`
@@ -424,48 +430,48 @@ function SetPassword({ onDone, recovery = false }) {
 // credit notes -- is about *findability*, not the page itself.
 const NAV_SECTIONS = [
   { section: "Overview", tabs: [
-    { key: "dashboard", i18n: "dashboard", icon: "🏠", access: ()=>true },
+    { key: "dashboard", i18n: "dashboard", icon: Home, access: ()=>true },
   ]},
   { section: "Sales", tabs: [
-    { key: "sales-orders", i18n: "salesOrders", icon: "📑", label: "Sales Orders", access: ()=>true },
-    { key: "invoices",  i18n: "invoices",  icon: "🧾", access: ()=>true },
-    { key: "notes-cn",  route: "notes", i18n: "notes", icon: "↩",  label: "Credit Notes", access: r=>["owner","accountant","staff"].includes(r) },
+    { key: "sales-orders", i18n: "salesOrders", icon: FileText, label: "Sales Orders", access: ()=>true },
+    { key: "invoices",  i18n: "invoices",  icon: Receipt, access: ()=>true },
+    { key: "notes-cn",  route: "notes", i18n: "notes", icon: Undo2,  label: "Credit Notes", access: r=>["owner","accountant","staff"].includes(r) },
   ]},
   { section: "Purchases", tabs: [
-    { key: "rfq", i18n: "rfq", icon: "📑", label: "RFQ / Quotations", access: ()=>true },
-    { key: "purchases", i18n: "purchases", icon: "🛒", access: ()=>true },
-    { key: "notes-dn",  route: "notes", i18n: "notes", icon: "↩",  label: "Debit Notes", access: r=>["owner","accountant","staff"].includes(r) },
+    { key: "rfq", i18n: "rfq", icon: FileQuestion, label: "RFQ / Quotations", access: ()=>true },
+    { key: "purchases", i18n: "purchases", icon: ShoppingCart, access: ()=>true },
+    { key: "notes-dn",  route: "notes", i18n: "notes", icon: Undo2,  label: "Debit Notes", access: r=>["owner","accountant","staff"].includes(r) },
   ]},
   // P3 Masters Unification — "Contacts" replaces "Parties" and gets its
   // own section. "Items" splits from Inventory: the master lives here,
   // controlled stock movement and reconciliation UI stays in Inventory.
   { section: "Contacts", tabs: [
-    { key: "contacts", i18n: "contacts", icon: "👥", label: "Contacts", access: ()=>true },
+    { key: "contacts", i18n: "contacts", icon: Users, label: "Contacts", access: ()=>true },
   ]},
   { section: "Items & Stock", tabs: [
-    { key: "items",       i18n: "items",       icon: "🏷",  label: "Items",      access: ()=>true },
-    { key: "categories",  i18n: "categories",  icon: "🗂",  label: "Categories", access: ()=>true },
-    { key: "inventory",   i18n: "inventory",   icon: "📦",  access: ()=>true },
+    { key: "items",       i18n: "items",       icon: Tag,        label: "Items",      access: ()=>true },
+    { key: "categories",  i18n: "categories",  icon: FolderTree, label: "Categories", access: ()=>true },
+    { key: "inventory",   i18n: "inventory",   icon: Package,    access: ()=>true },
   ]},
   { section: "Banking", tabs: [
-    { key: "recon", i18n: "recon", icon: "🏦", label: "Bank Reconciliation", access: r=>["owner","accountant"].includes(r) },
+    { key: "recon", i18n: "recon", icon: Landmark, label: "Bank Reconciliation", access: r=>["owner","accountant"].includes(r) },
   ]},
   { section: "Accounting", tabs: [
-    { key: "vouchers", i18n: "vouchers",        icon: "📝", access: r=>["owner","accountant"].includes(r) },
-    { key: "ledger",   i18n: "ledger",          icon: "📖", access: r=>["owner","accountant","viewer"].includes(r) },
-    { key: "accounts", i18n: "chartOfAccounts", icon: "📚", label: "Chart of Accounts", access: r=>["owner","accountant"].includes(r) },
+    { key: "vouchers", i18n: "vouchers",        icon: NotebookPen, access: r=>["owner","accountant"].includes(r) },
+    { key: "ledger",   i18n: "ledger",          icon: BookOpen,    access: r=>["owner","accountant","viewer"].includes(r) },
+    { key: "accounts", i18n: "chartOfAccounts", icon: Library,     label: "Chart of Accounts", access: r=>["owner","accountant"].includes(r) },
   ]},
   { section: "Reports", tabs: [
-    { key: "reports", i18n: "reports", icon: "📊", access: r=>["owner","accountant","viewer"].includes(r) },
+    { key: "reports", i18n: "reports", icon: BarChart3, access: r=>["owner","accountant","viewer"].includes(r) },
   ]},
   { section: "Tax & Compliance", tabs: [
-    { key: "vat", i18n: "vat", icon: "🧾", label: "VAT Filing", access: r=>["owner","accountant","viewer"].includes(r) },
-    { key: "tds", i18n: "tds", icon: "📋", label: "TDS", access: r=>["owner","accountant"].includes(r) },
+    { key: "vat", i18n: "vat", icon: ScrollText, label: "VAT Filing", access: r=>["owner","accountant","viewer"].includes(r) },
+    { key: "tds", i18n: "tds", icon: Percent,    label: "TDS", access: r=>["owner","accountant"].includes(r) },
   ]},
   { section: "Settings", tabs: [
-    { key: "team",     i18n: "team",     icon: "🧑‍💼", label: "Team", access: r=>r==="owner" },
-    { key: "settings", i18n: "settings", icon: "⚙",  label: "Settings", access: r=>["owner","accountant"].includes(r) },
-    { key: "audit",    i18n: "auditLog", icon: "🔒", label: "Audit Log", access: r=>["owner","accountant"].includes(r) },
+    { key: "team",     i18n: "team",     icon: UserCog,     label: "Team", access: r=>r==="owner" },
+    { key: "settings", i18n: "settings", icon: SettingsIcon, label: "Settings", access: r=>["owner","accountant"].includes(r) },
+    { key: "audit",    i18n: "auditLog", icon: ShieldCheck, label: "Audit Log", access: r=>["owner","accountant"].includes(r) },
   ]},
 ];
 
@@ -533,7 +539,7 @@ function Authed({ session, lang, toggleLang }) {
 
       {/* Mobile menu toggle */}
       <button className="sidebar-toggle no-print" onClick={()=>setSidebarOpen(s=>!s)}>
-        {sidebarOpen ? "✕" : "☰"}
+        {sidebarOpen ? <X size={20} /> : <Menu size={20} />}
       </button>
 
       <aside className={"sidebar" + (sidebarOpen ? " sidebar-open" : "")}>
@@ -550,7 +556,7 @@ function Authed({ session, lang, toggleLang }) {
                   <NavLink key={tk.key} to={"/" + (tk.route || tk.key)}
                     className={({ isActive }) => "sidebar-item" + (isActive ? " active" : "")}
                     onClick={() => setSidebarOpen(false)}>
-                    <span className="sidebar-item-icon">{tk.icon}</span>
+                    <span className="sidebar-item-icon"><tk.icon size={16} strokeWidth={2} /></span>
                     <span>{tk.label || t(tk.i18n, lang)}</span>
                   </NavLink>
                 ))}
@@ -562,7 +568,7 @@ function Authed({ session, lang, toggleLang }) {
         <div className="sidebar-footer">
           {workspace.activeWS && (
             <div className="ws-badge" title={"Working as "+workspace.role+" in "+workspace.activeWS.biz_name}>
-              📋 {workspace.activeWS.biz_name}
+              <ClipboardList size={14} /> {workspace.activeWS.biz_name}
               <button className="ws-switch-btn" onClick={()=>workspace.switchWorkspace(session.user.id)}>← Own</button>
             </div>
           )}
@@ -860,7 +866,7 @@ function Style() {
   .sidebar-item{display:flex;align-items:center;gap:10px;width:100%;text-align:left;background:transparent;border:none;color:#e8e3d3;padding:9px 10px;border-radius:8px;cursor:pointer;font-size:13.5px;margin-bottom:2px;transition:background .12s;text-decoration:none}
   .sidebar-item:hover{background:#ffffff14}
   .sidebar-item.active{background:#f3efe2;color:var(--green2);font-weight:700}
-  .sidebar-item-icon{font-size:15px;width:18px;text-align:center;flex-shrink:0}
+  .sidebar-item-icon{display:inline-flex;align-items:center;justify-content:center;width:18px;flex-shrink:0}
   .sidebar-footer{padding:14px 14px 16px;border-top:1px solid #ffffff1a;display:flex;flex-direction:column;gap:8px}
   .sidebar-footer-row{display:flex;justify-content:space-between;align-items:center}
   .sidebar-signout{width:100%;justify-content:center}
@@ -871,7 +877,7 @@ function Style() {
   @media (max-width: 880px) {
     .sidebar{position:fixed;left:0;top:0;transform:translateX(-100%);transition:transform .2s;z-index:9997;box-shadow:4px 0 24px #00000030}
     .sidebar.sidebar-open{transform:translateX(0)}
-    .sidebar-toggle{display:block;position:fixed;top:14px;left:14px;z-index:9996;background:var(--green2);color:#f3efe2;border:none;border-radius:8px;width:40px;height:40px;font-size:18px;cursor:pointer;box-shadow:0 2px 10px #00000030}
+    .sidebar-toggle{display:flex;align-items:center;justify-content:center;position:fixed;top:14px;left:14px;z-index:9996;background:var(--green2);color:#f3efe2;border:none;border-radius:8px;width:40px;height:40px;cursor:pointer;box-shadow:0 2px 10px #00000030}
     .sidebar-backdrop{display:block;position:fixed;inset:0;background:#00000050;z-index:9995}
     .app-main-sidebar{padding:70px 16px 40px}
   }

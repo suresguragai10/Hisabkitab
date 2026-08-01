@@ -4,6 +4,10 @@ import { formatMoney } from "../lib/format";
 import PageHeader from "../components/PageHeader";
 import Money from "../components/Money";
 import StatusBadge from "../components/StatusBadge";
+import {
+  Wallet, ArrowDownToLine, ArrowUpFromLine, AlertTriangle, TrendingUp,
+  BarChart3, ScrollText, Package, CalendarClock, Percent, Landmark, Ban, Ruler,
+} from "lucide-react";
 
 const fmt  = formatMoney;
 const fmtK = (n) => {
@@ -89,21 +93,21 @@ export default function Dashboard({ refreshKey, onNav }) {
               value={"NPR " + fmtK(stats.cash)}
               sub="Available balance"
               color="green"
-              icon="💰"
+              icon={Wallet}
             />
             <DashCard
               label="Receivables"
               value={"NPR " + fmtK(stats.receivables)}
               sub="Customers owe you"
               color={stats.receivables > 0 ? "gold" : "neutral"}
-              icon="📥"
+              icon={ArrowDownToLine}
             />
             <DashCard
               label="Payables"
               value={"NPR " + fmtK(stats.payables)}
               sub="You owe vendors"
               color={stats.payables > 0 ? "rust" : "neutral"}
-              icon="📤"
+              icon={ArrowUpFromLine}
             />
             {stats.overdue_count > 0 && (
               <DashCard
@@ -111,7 +115,7 @@ export default function Dashboard({ refreshKey, onNav }) {
                 value={stats.overdue_count}
                 sub={stats.overdue_amount != null ? `NPR ${fmtK(stats.overdue_amount)} past due` : "Past due date"}
                 color="rust"
-                icon="⚠"
+                icon={AlertTriangle}
               />
             )}
           </div>
@@ -126,14 +130,14 @@ export default function Dashboard({ refreshKey, onNav }) {
                 ? (salesTrend >= 0 ? "▲ " : "▼ ") + Math.abs(salesTrend) + "% vs last month"
                 : "No sales last month"}
               color={salesTrend >= 0 ? "green" : "rust"}
-              icon="📈"
+              icon={TrendingUp}
             />
             <DashCard
               label="Sales Last Month"
               value={"NPR " + fmtK(stats.sales_last)}
               sub="Previous month"
               color="neutral"
-              icon="📊"
+              icon={BarChart3}
             />
             <DashCard
               label="VAT This Month"
@@ -142,14 +146,14 @@ export default function Dashboard({ refreshKey, onNav }) {
                 ? (daysToVat > 0 ? `Due in ${daysToVat} days (${vatDeadline})` : `Overdue! Due ${vatDeadline}`)
                 : ""}
               color={daysToVat !== null && daysToVat <= 5 ? "rust" : "gold"}
-              icon="🧾"
+              icon={ScrollText}
             />
             <DashCard
               label="Stock Value"
               value={"NPR " + fmtK(stats.stock_value)}
               sub={stats.low_stock > 0 ? `⚠ ${stats.low_stock} item(s) low on stock` : "All stock levels OK"}
               color={stats.low_stock > 0 ? "gold" : "neutral"}
-              icon="📦"
+              icon={Package}
             />
             {stats.gross_margin_pct != null && (
               <DashCard
@@ -157,7 +161,7 @@ export default function Dashboard({ refreshKey, onNav }) {
                 value={stats.gross_margin_pct + "%"}
                 sub="This month, sales vs. COGS"
                 color={stats.gross_margin_pct >= 20 ? "green" : stats.gross_margin_pct >= 0 ? "gold" : "rust"}
-                icon="📐"
+                icon={Ruler}
               />
             )}
           </div>
@@ -171,7 +175,7 @@ export default function Dashboard({ refreshKey, onNav }) {
                 value={stats.bills_due_soon_count}
                 sub={`NPR ${fmtK(stats.bills_due_soon_amount)} due within 7 days`}
                 color="gold"
-                icon="📅"
+                icon={CalendarClock}
               />
             )}
             {stats.bills_overdue_count > 0 && (
@@ -180,7 +184,7 @@ export default function Dashboard({ refreshKey, onNav }) {
                 value={stats.bills_overdue_count}
                 sub={`NPR ${fmtK(stats.bills_overdue_amount)} past due`}
                 color="rust"
-                icon="⚠"
+                icon={AlertTriangle}
               />
             )}
             {stats.tds_pending > 0.005 && (
@@ -189,7 +193,7 @@ export default function Dashboard({ refreshKey, onNav }) {
                 value={"NPR " + fmtK(stats.tds_pending)}
                 sub="Deducted, not yet remitted"
                 color="gold"
-                icon="🧾"
+                icon={Percent}
               />
             )}
             {stats.bank_unreconciled > 0 && (
@@ -198,7 +202,7 @@ export default function Dashboard({ refreshKey, onNav }) {
                 value={stats.bank_unreconciled}
                 sub="Statement line(s) awaiting match"
                 color="gold"
-                icon="🏦"
+                icon={Landmark}
               />
             )}
             {stats.negative_stock_count > 0 && (
@@ -207,7 +211,7 @@ export default function Dashboard({ refreshKey, onNav }) {
                 value={stats.negative_stock_count}
                 sub="Item(s) below zero — needs a look"
                 color="rust"
-                icon="🚫"
+                icon={Ban}
               />
             )}
           </div>}
@@ -298,7 +302,7 @@ export default function Dashboard({ refreshKey, onNav }) {
   );
 }
 
-function DashCard({ label, value, sub, color, icon }) {
+function DashCard({ label, value, sub, color, icon: Icon }) {
   const colors = {
     green:   { bg:"#e8f5f0", border:"#1f6f54", text:"#1f6f54" },
     gold:    { bg:"#fdf6e3", border:"#b9892f", text:"#8a6520" },
@@ -311,7 +315,7 @@ function DashCard({ label, value, sub, color, icon }) {
       background: c.bg, border: `1.5px solid ${c.border}`,
       borderRadius: 10, padding: "14px 16px", flex: "1 1 160px", minWidth: 140,
     }}>
-      <div style={{fontSize:20, marginBottom:4}}>{icon}</div>
+      <div style={{marginBottom:6, color:c.text}}><Icon size={20} strokeWidth={2} /></div>
       <div style={{fontSize:20, fontWeight:700, fontFamily:"Georgia,serif", color:c.text, lineHeight:1.2}}>{value}</div>
       <div style={{fontSize:12, color:"#555", marginTop:4, fontWeight:600}}>{label}</div>
       {sub && <div style={{fontSize:11, color:c.text, marginTop:3, opacity:0.85}}>{sub}</div>}
