@@ -11,6 +11,7 @@ import DocumentActivityModal from "../components/DocumentActivityModal";
 import PageHeader from "../components/PageHeader";
 import Money from "../components/Money";
 import StatusBadge from "../components/StatusBadge";
+import Button from "../components/Button";
 import PaymentModal from "./PaymentModal";
 import { useBusinessProfile } from "../lib/businessProfile";
 
@@ -446,10 +447,10 @@ export default function Purchases() {
                       {lifecycle === "draft" && <>
                         <button className="link" onClick={() => editDraft(bill)}>Edit</button>
                         <button className="link" onClick={() => postDraft(bill)} disabled={busy}>Post</button>
-                        <button className="link" style={{ color: "var(--rust)" }} onClick={() => removeDraft(bill)} disabled={busy}>Delete</button>
+                        <Button variant="link" danger onClick={() => removeDraft(bill)} disabled={busy}>Delete</Button>
                       </>}
                       {lifecycle === "posted" && ["open", "partial", "overdue"].includes(bill.status) && <button className="link" onClick={() => setPayModal(bill)}>{Number(bill.amount_paid || 0) > 0 ? "More Payment" : "Record Payment"}</button>}
-                      {lifecycle === "posted" && Number(bill.amount_paid || 0) === 0 && Number(bill.credited_amount || 0) === 0 && <button className="link" style={{ color: "var(--rust)" }} onClick={() => setCancelDoc(bill)}>Cancel</button>}
+                      {lifecycle === "posted" && Number(bill.amount_paid || 0) === 0 && Number(bill.credited_amount || 0) === 0 && <Button variant="link" danger onClick={() => setCancelDoc(bill)}>Cancel</Button>}
                     </td>
                   </tr>
                 );

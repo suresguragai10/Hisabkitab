@@ -9,6 +9,7 @@ import { formatMoney } from "../lib/format";
 import PageHeader from "../components/PageHeader";
 import Money from "../components/Money";
 import StatusBadge from "../components/StatusBadge";
+import Button from "../components/Button";
 
 const fmt = formatMoney;
 
@@ -292,7 +293,7 @@ export default function CreditDebitNotes() {
                     <td style={{ whiteSpace: "nowrap" }}>
                       <button className="link" onClick={() => setPrintNote(note)}>Print</button>
                       <button className="link" onClick={() => setActivityNote(note)}>Activity</button>
-                      {note.document_status === "posted" && <button className="link" style={{ color: "var(--rust)" }} onClick={() => setCancelNote(note)}>Cancel</button>}
+                      {note.document_status === "posted" && <Button variant="link" danger onClick={() => setCancelNote(note)}>Cancel</Button>}
                     </td>
                   </tr>
                 );

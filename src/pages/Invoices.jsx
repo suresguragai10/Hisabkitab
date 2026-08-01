@@ -11,6 +11,7 @@ import DocumentActivityModal from "../components/DocumentActivityModal";
 import PageHeader from "../components/PageHeader";
 import Money from "../components/Money";
 import StatusBadge from "../components/StatusBadge";
+import Button from "../components/Button";
 import PaymentModal from "./PaymentModal";
 import { showToast } from "../lib/dialogs";
 import { useTaxRates } from "../lib/taxRates";
@@ -646,13 +647,13 @@ export default function Invoices() {
                       {lifecycle === "draft" && <>
                         <button className="link" onClick={() => editDraft(invoice)}>Edit</button>
                         <button className="link" onClick={() => postDraft(invoice)} disabled={busy}>Post</button>
-                        <button className="link" style={{ color: "var(--rust)" }} onClick={() => removeDraft(invoice)} disabled={busy}>Delete</button>
+                        <Button variant="link" danger onClick={() => removeDraft(invoice)} disabled={busy}>Delete</Button>
                       </>}
                       {lifecycle === "posted" && ["open", "partial", "overdue"].includes(invoice.status) && (
                         <button className="link" onClick={() => setPayModal(invoice)}>{Number(invoice.amount_paid || 0) > 0 ? "More Payment" : "Record Payment"}</button>
                       )}
                       {lifecycle === "posted" && Number(invoice.amount_paid || 0) === 0 && Number(invoice.credited_amount || 0) === 0 && (
-                        <button className="link" style={{ color: "var(--rust)" }} onClick={() => setCancelDoc(invoice)}>Cancel</button>
+                        <Button variant="link" danger onClick={() => setCancelDoc(invoice)}>Cancel</Button>
                       )}
                     </td>
                   </tr>

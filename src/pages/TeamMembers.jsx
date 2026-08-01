@@ -4,6 +4,7 @@ import { useWorkspace } from "../lib/workspace";
 import { confirmDialog, showToast } from "../lib/dialogs";
 import PageHeader from "../components/PageHeader";
 import StatusBadge from "../components/StatusBadge";
+import Button from "../components/Button";
 
 const ROLES = [
   { value: "accountant", label: "Accountant", desc: "Full access except team management" },
@@ -153,10 +154,10 @@ export default function TeamMembers() {
                 <td className="muted">{m.joined_at ? new Date(m.joined_at).toLocaleDateString() : "—"}</td>
                 <td>
                   {m.member_user_id && (
-                    <button className="link" style={{color:"var(--rust)"}}
+                    <Button variant="link" danger
                       onClick={() => remove(m.member_user_id, m.member_email)}>
                       Remove
-                    </button>
+                    </Button>
                   )}
                 </td>
               </tr>

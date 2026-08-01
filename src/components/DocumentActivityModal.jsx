@@ -7,6 +7,7 @@ import {
   registerAttachment,
 } from "../lib/lifecycle";
 import Modal from "./Modal";
+import Button from "./Button";
 
 function formatBytes(value) {
   const bytes = Number(value || 0);
@@ -162,7 +163,7 @@ export default function DocumentActivityModal({ documentType, document, title, o
                     {[attachment.mime_type, formatBytes(attachment.size_bytes)].filter(Boolean).join(" · ")}
                   </div>
                 </div>
-                <button className="link" style={{ color: "var(--rust)" }} onClick={() => removeAttachment(attachment)} disabled={busy}>Delete</button>
+                <Button variant="link" danger onClick={() => removeAttachment(attachment)} disabled={busy}>Delete</Button>
               </div>
             ))}
           </div>

@@ -19,6 +19,7 @@ import LifecycleActionModal from "../components/LifecycleActionModal";
 import PageHeader from "../components/PageHeader";
 import Money from "../components/Money";
 import StatusBadge from "../components/StatusBadge";
+import Button from "../components/Button";
 import { showToast, confirmDialog } from "../lib/dialogs";
 
 const VAT_RATE = 13;
@@ -304,11 +305,11 @@ export default function SalesOrdersRFQ({ docType, lang = "en" }) {
                     {doc.status === "draft" && <>
                       <button className="link" onClick={() => openEdit(doc)}>Edit</button>{" · "}
                       <button className="link" onClick={() => doCommit(doc)}>{commitLabel}</button>{" · "}
-                      <button className="link" style={{ color: "var(--rust)" }} onClick={() => doDeleteDraft(doc)}>Delete</button>
+                      <Button variant="link" danger onClick={() => doDeleteDraft(doc)}>Delete</Button>
                     </>}
                     {doc.status === commitStatus && <>
                       <button className="link" onClick={() => doConvert(doc)}>{convertLabel}</button>{" · "}
-                      <button className="link" style={{ color: "var(--rust)" }} onClick={() => setCancelDoc(doc)}>Cancel</button>
+                      <Button variant="link" danger onClick={() => setCancelDoc(doc)}>Cancel</Button>
                     </>}
                     {doc.status === "converted" && (
                       <Link className="link" to={`/${isSO ? "invoices" : "purchases"}?open=${isSO ? doc.invoice_id : doc.bill_id}`}>

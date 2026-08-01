@@ -4,6 +4,7 @@ import { fiscalYearFor } from "../lib/fiscalYear";
 import { todayLocalDate } from "../lib/nepaliCalendar";
 import { confirmDialog } from "../lib/dialogs";
 import Money from "../components/Money";
+import Button from "../components/Button";
 import {
   createStructuredAccount,
   deactivateStructuredAccount,
@@ -397,7 +398,7 @@ export default function ChartOfAccounts({ onChanged }) {
                 <td style={{ whiteSpace: "nowrap" }}>
                   {!account.is_system_account && <button className="link" onClick={() => beginEdit(account)}>Edit</button>}
                   {mergeable && account.is_active && <button className="link" onClick={() => deactivate(account)}>Archive</button>}
-                  {mergeable && <button className="link" style={{ color: "var(--rust)" }} onClick={() => remove(account)}>Delete</button>}
+                  {mergeable && <Button variant="link" danger onClick={() => remove(account)}>Delete</Button>}
                   {mergeable && account.is_active && mergeTargets.length > 0 && (
                     <button className="link" onClick={() => { setMerging(merging?.id === account.id ? null : account); setMergeTargetId(""); setError(null); }}>
                       {merging?.id === account.id ? "Cancel" : "Merge into…"}
