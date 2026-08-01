@@ -694,7 +694,7 @@ function Style() {
   .tab.active{background:#f3efe2;color:var(--green2);font-weight:700}
   .app-main{max-width:1080px;margin:0 auto;padding:22px 18px 60px;display:flex;flex-direction:column;gap:20px}
   .panel{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:22px;box-shadow:0 12px 34px #10211b0f}
-  .panel-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;gap:12px;flex-wrap:wrap}
+  .panel-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:var(--space-5);padding-bottom:var(--space-4);border-bottom:1px solid var(--line);gap:12px;flex-wrap:wrap}
   .panel-head h2{font-family:Georgia,serif;margin:0;font-size:20px}
   .sub-head{font-size:14px;margin:18px 0 8px;color:var(--ink2)}
   .inline-form{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:18px;align-items:center}
@@ -767,7 +767,7 @@ function Style() {
   @media(max-width:760px){.voucher-meta-grid{grid-template-columns:1fr}.voucher-narration-field{grid-column:auto}.voucher-balance{width:100%;text-align:left}.voucher-actions{align-items:stretch}.voucher-submit-actions{width:100%}.voucher-submit-actions button{flex:1}}
   .msg-inline{font-size:12px}
   .msg-inline.err{color:var(--rust)}
-  .stat-row{display:flex;gap:14px;flex-wrap:wrap;margin-bottom:8px}
+  .stat-row{display:flex;gap:14px;flex-wrap:wrap;margin-bottom:var(--space-5)}
   .stat{flex:1 1 130px;background:#10211b08;border-radius:12px;padding:14px;text-align:center}
   .stat span{display:block;font-size:24px;font-weight:700;color:var(--green2);font-family:Georgia,serif}
   .ghost-btn{background:transparent;border:1px solid var(--line);color:var(--ink2);padding:8px 14px;border-radius:8px;cursor:pointer;font-size:13px}
@@ -810,7 +810,7 @@ function Style() {
   .inv-sign-line{width:160px;border-top:1px solid #333;margin-bottom:6px}
   .inv-footer-note{font-size:12px;color:#888}
   @media print{.no-print{display:none!important}.invoice-paper{border:none;padding:20px;max-width:100%}.print-overlay{padding:0}}
-  .filter-tabs{display:flex;gap:6px;margin:14px 0 8px;flex-wrap:wrap}
+  .filter-tabs{display:flex;gap:6px;margin:var(--space-4) 0;padding-bottom:var(--space-3);border-bottom:1px solid var(--line);flex-wrap:wrap}
   .filter-tab{background:transparent;border:1px solid var(--line);color:var(--ink2);padding:5px 12px;border-radius:20px;cursor:pointer;font-size:12.5px}
   .filter-tab.active{background:var(--green2);color:#fff;border-color:var(--green2)}
   .overdue{color:var(--rust);font-weight:600}
